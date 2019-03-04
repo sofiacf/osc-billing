@@ -1,124 +1,100 @@
-//Universal Variables - Monthly Disp/Billing/Payroll Sheet
-//TO DO: Summary sheet, post button, rerun for new clients, uppercase?, DATE ORDER WTF??
-var OSCMaster = SpreadsheetApp.getActiveSpreadsheet().getSheets()[1];
-var monthlyData = OSCMaster.getRange(4, 2, OSCMaster.getLastRow()-1, 13).getValues();
-var today = Utilities.formatDate(new Date(), "GMT-4", "M/d/yy");
-var billPeriod = OSCMaster.getSheetName();
-var invoiceFolder = DriveApp.getFoldersByName("INVOICES").next();
-var folderName = "Invoices Date: " + today;
-var summaryName = "Inv. Report - " + today;
-function setupFolder(){
-  function setupSummary(folder){
-    var template = DriveApp.getFilesByName("Billing Summary Template").next().getId();
-    DriveApp.getFileById(template).makeCopy(summaryName, DriveApp.getFolderById(folder));
+var billPeriod, billsCreated = 0;
+function Client(infoArray, lineItems){
+  const clientsFolder = DriveApp.getFoldersByName("CLIENTS").next();
+  var name = infoArray[1], total = 0, items = [], itemArrays = [], suffix = infoArray[7], fileName, folder, numItems,
+      info = (infoArray[2]) ? [[name], [infoArray[2]], [infoArray[3]], [infoArray[4]]] : [[name], [infoArray[3]], [infoArray[4]], [""]], invNum = infoArray[6]+1;
+  this.id = infoArray[0];
+  for (var i=0; i<lineItems.length; i++) if (lineItems[i].id == this.id) items.push(lineItems[i]);
+  numItems = items.length;
+  for (var j=0; j<numItems; j++) total += items[j].amount;
+  var invInfo = [[today], [invNum], [String(billPeriod).toUpperCase()], [total]];
+  this.total = total;
+  for (var k=0; k<numItems; k++) itemArrays.push(items[k].lineItem);
+  fileName = this.id + " - # " + invNum + suffix + " - " + today;
+  if (!DriveApp.getFoldersByName(this.id).hasNext()) clientsFolder.createFolder(this.id);
+  folder = DriveApp.getFoldersByName(this.id).next();
+  this.generateInvoice = function(){
+    var template, file, lineItemRange, priceColumnRange, dateColumnRange, isNixon = (this.id == "NIXON");
+    template = (isNixon) ? DriveApp.getFilesByName("Nixon Template").next().getId() : DriveApp.getFilesByName("Template").next().getId();
+    DriveApp.getFileById(template).makeCopy(fileName, folder); //Copy template file
+    file = SpreadsheetApp.open(DriveApp.getFilesByName(fileName).next()).getSheets()[0];
+    var invInfoRange = (isNixon) ? file.getRange("H4:H7") : file.getRange("F4:F7"), clientInfoRange = file.getRange("A11:A14"), totalRange = (isNixon) ? file.getRange("I18") : file.getRange("G18"); //Cells for invoice data
+    invInfoRange.setValues(invInfo);
+    clientInfoRange.setValues(info);
+    totalRange.setValue(total);
+    SpreadsheetApp.flush();
+    file.insertRows(16, numItems); //Add rows for line items
+    lineItemRange = file.getRange(16, 1, numItems, itemArrays[0].length);
+    lineItemRange.setValues(itemArrays);
+    SpreadsheetApp.flush();
+    priceColumnRange = (isNixon) ? file.getRange(16, 9, numItems) : file.getRange(16, 7, numItems);
+    priceColumnRange.setNumberFormat('$0.00');
+    lineItemRange.setHorizontalAlignment('general-center').setFontSize(10).setWrap(true);
+    dateColumnRange = file.getRange(16, 1, numItems);
+    dateColumnRange.setHorizontalAlignment('general-left');
+    dateColumnRange.setNumberFormat('MM/dd/yy');
+    SpreadsheetApp.flush();
+    var invFolder = DriveApp.getFoldersByName(name), ss = DriveApp.getFilesByName(fileName).next(), pdfName = ss.getName();
+    DriveApp.getFileById(ss.getId()).makeCopy(this.id + "tmp_pdf_copy", folder);
+    var pdfSheet = DriveApp.getFilesByName(this.id + "tmp_pdf_copy").next(), url = pdfSheet.getUrl(),
+        url_ext = 'export?exportFormat=pdf&format=pdf' + '&fitw=true' + '&portrait=false' + '&gridlines=false' + '&gid=' + file.getSheetId();
+    url = url.replace("edit?usp=drivesdk", '');
+    var token = ScriptApp.getOAuthToken(), response = UrlFetchApp.fetch(url + url_ext, {headers: {'Authorization': 'Bearer ' + token}}), 
+        blob = response.getBlob().setName(pdfName), newFile = DriveApp.getFoldersByName("Invoices Date: " + today).next().createFile(blob);
+    pdfSheet.setTrashed(true);
+    billsCreated+=1;
   }
-  if (DriveApp.getFoldersByName(folderName).hasNext()){ //Delete existing folder if one exists
-    DriveApp.getFoldersByName(folderName).next().setTrashed(true);
-  }
+}
+function Charge(id, itemArray){
+  this.id = id,
+    this.lineItem = (id == "NIXON") ? [itemArray[0]].concat(itemArray.slice(4, 11).concat(itemArray[12]))
+    : [itemArray[0], itemArray[4], itemArray[5], itemArray[6], itemArray[7], itemArray[8], itemArray[12]];
+  this.amount = (isNaN(parseFloat(itemArray[12]))) ? 0 : parseFloat(itemArray[12]);
+}
+function Setup(){
+  const OSCMaster = SpreadsheetApp.getActiveSpreadsheet().getSheets()[1], lastMasterRow = OSCMaster.getLastRow(),
+      monthlyData = OSCMaster.getRange(4, 2, lastMasterRow-4, 13).getValues(),
+      invoiceFolder = DriveApp.getFoldersByName("INVOICES").next(),folderName = "Invoices Date: " + today;
+  billPeriod = OSCMaster.getSheetName();
+  if (DriveApp.getFoldersByName(folderName).hasNext()) DriveApp.getFoldersByName(folderName).next().setTrashed(true); //Delete existing invoice folder
   invoiceFolder.createFolder(folderName); //Make a new folder
-  var folder = DriveApp.getFoldersByName(folderName).next().getId();
-  setupSummary(folder);
-}
-function createSummary(){
-  var summary = DriveApp.getFilesByName(summaryName).next();
-}
-function setupClients(){
-  var clients = [];
-  var clientsFolder = DriveApp.getFoldersByName("CLIENTS").next();
-  var OSCClientSheet = SpreadsheetApp.open(DriveApp.getFilesByName("Client Billing Information").next()).getSheets()[0];
-  function Client(infoArray){
-    this.id = infoArray[0];
-    this.name = infoArray[1];
-    if (infoArray[2]){
-      this.info = [[this.name], [infoArray[2]], [infoArray[3]], [infoArray[4]]]; //name, attn, address, city
-    } else {
-      this.info = [[this.name], [infoArray[3]], [infoArray[4]], ['']]; //name, address, city, and a blank box
-    }
-    this.name = infoArray[1];
-    this.invNum = infoArray[6] + 1;
-    this.suffix = infoArray[7];
-    this.fileName = this.id + " - # " + this.invNum + this.suffix + " - " + today;
-    if (!DriveApp.getFoldersByName(this.id).hasNext()){
-      clientsFolder.createFolder(this.id);
-    }
-    this.folder = DriveApp.getFoldersByName(this.id).next();
-    this.generateInvoice = function(){
-      var template = DriveApp.getFilesByName("Template").next().getId();
-      DriveApp.getFileById(template).makeCopy(this.fileName, this.folder);
-      var file = SpreadsheetApp.open(DriveApp.getFilesByName(this.fileName).next()).getSheets()[0];
-      var items = [];
-      var total = 0;
-      var inputItems = OSCMaster.getRange(4, 2, OSCMaster.getLastRow()-4, 13).getValues().sort();
-      for (i=0; i<inputItems.length; i++){
-        if (inputItems[i][2] == this.id){ //Add items
-          items.push([
-            inputItems[i][0], //date
-            inputItems[i][4], //address
-            inputItems[i][5], //company
-            inputItems[i][6], //type
-            inputItems[i][7], //add charges
-            inputItems[i][8], //charge code
-            inputItems[i][12]]); //price
-          total += inputItems[i][12];
-        }
-      }
-      file.insertRows(16, items.length);
-      file.getRange(16, 1, items.length, items[0].length).setValues(items).setHorizontalAlignment('general-center').setFontSize(10).setWrap(true);
-      SpreadsheetApp.flush();
-      file.getRange("F4:F7").setValues([[today], [this.invNum], [String(billPeriod).toUpperCase()], [total]]); //Add info
-      file.getRange("A11:A14").setValues(this.info);
-      var priceColumn = file.getRange(16, 7, items.length); //Format sheet
-      priceColumn.setNumberFormat('$0.00');
-      var dateColumn = file.getRange(16, 1, items.length);
-      dateColumn.setHorizontalAlignment('general-left');
-      file.getRange(priceColumn.activate().getLastRow()+3, 7).setValue(total);
-      file.getRange(16, 1, items.length).setHorizontalAlignment('general-left');
-      SpreadsheetApp.flush();
-      var ss = DriveApp.getFilesByName(this.fileName).next();
-      var pdfName = ss.getName();
-      DriveApp.getFileById(ss.getId()).makeCopy(this.id + "tmp_pdf_copy", this.folder);
-      var pdfSheet = DriveApp.getFilesByName(this.id + "tmp_pdf_copy").next();
-      var url = pdfSheet.getUrl();
-      url = url.replace("edit?usp=drivesdk", '');
-      var url_ext = 'export?exportFormat=pdf&format=pdf' + '&fitw=true' + '&portrait=false' + '&gridlines=false' + '&gid=' + file.getSheetId();
-      var token = ScriptApp.getOAuthToken();
-      var response = UrlFetchApp.fetch(url + url_ext, {headers: {'Authorization': 'Bearer ' + token}});
-      var blob = response.getBlob().setName(pdfName);
-      var newFile = DriveApp.getFoldersByName(folderName).next().createFile(blob);
-      pdfSheet.setTrashed(true);
-      return;
-    }
-  }
-  var inputClients = OSCMaster.getRange(4, 4, OSCMaster.getLastRow()-4).getValues().sort(); //Add unique ID to activeClients
-  var activeClients = [];
-  activeClients.push(inputClients[0][0]);
-  for (i=1; i<inputClients.length; i++){
-    if (inputClients[i][0] != inputClients[i-1][0]){
-      activeClients.push(inputClients[i][0]);
-    }
-  }
-  var existingClients = OSCClientSheet.getRange(2, 1, OSCClientSheet.getLastRow()-2,8).getValues(); //Create Client w/ info or push to new
-  var newClients = [];
-  for (i=0; i<activeClients.length; i++){
-    var match = false;
-    for (j=0;j<existingClients.length; j++){
-      if (activeClients[i] == existingClients[j][0]){
-        match = true;
-        if (existingClients[j][5]){
-          var thisClient = new Client(existingClients[j].slice(0,8));
-          clients.push(thisClient);
-        }
-        else {
-          newClients.push(existingClients[j][0]);
-        }
-        break;
+  const folder = DriveApp.getFoldersByName(folderName).next(), summaryTemplate = DriveApp.getFilesByName("Billing Summary Template").next(), summaryName = "Inv. Report - " + today;
+  summaryTemplate.makeCopy(summaryName, folder);
+  this.summary = DriveApp.getFilesByName(summaryName).next(), this.charges = [];
+  for (var i=0; i<monthlyData.length; i++) this.charges.push(new Charge(monthlyData[i][2], monthlyData[i]));
+  function getClients(charges){
+    const clients = [], inputClients = [], activeClients = [], existingClients = [], newClients = [], 
+        clientInfoSheet = SpreadsheetApp.open(DriveApp.getFilesByName("Client Billing Information").next()).getSheets()[0], 
+        clientData = clientInfoSheet.getRange(2, 1, clientInfoSheet.getLastRow()-2,8).getValues();
+    for (var i=0; i<monthlyData.length; i++) if (monthlyData[i][2]) inputClients.push(monthlyData[i][2]);
+    for (var i=0; i<inputClients.length; i++) if (!activeClients.includes(inputClients[i])) activeClients.push(inputClients[i]);
+    for (var i=0; i<clientData.length; i++) existingClients[i] = clientData[i][0];
+    for (var i=0; i<activeClients.length; i++) if (!existingClients.includes(activeClients[i])) newClients.push([
+      [activeClients[i]], ["Name"], ["Attn. (optional)"], ["Address"], ["City, State Zip"], [0],["Suffix??"], ["NEW"]]);
+    function matchClients(){
+      for (var f=0; f<activeClients.length; f++){
+        if (!existingClients.includes(activeClients[f])) continue;
+        var clientIndex = existingClients.indexOf(activeClients[f]), clientInfoArray = clientData[clientIndex].slice(0,8), thisClient = new Client(clientInfoArray, charges);
+        if (thisClient.total < 1) newClients.push(clientInfoArray);
+        else clients.push(thisClient);
       }
     }
-    if (!match) {
-      newClients.push(activeClients[i]);
-      //        SpreadsheetApp.flush();
-      //        OSCClientSheet.getRange(OSCClientSheet.getLastRow()+1, 1).setValues([[activeClients[i]]]);
-    }
+    matchClients();
+    return [clients, newClients];
   }
-  return clients;
+  var clientsArray = getClients(this.charges);
+  this.clients = clientsArray[0], this.newClients = clientsArray[1], this.clientIdList = [];
+  for (var g = 0; g < clientsArray[0].length; g++) this.clientIdList.push([clientsArray[0][g].id]);
+}
+function makeSummary(run){
+  var runSummary = SpreadsheetApp.open(run.summary).getSheets()[0], expectedTotal = 0;
+  for (i=0; i<run.charges.length; i++) expectedTotal+= run.charges[i].amount;
+  runSummary.getRange("B3:B5").setValues([[today],[billsCreated],[expectedTotal]]);
+  runSummary.getRange(10, 1, run.newClients.length, run.newClients[0].length).setValues(run.newClients);
+  runSummary.getRange(30, 1, run.clientIdList.length).setValues(run.clientIdList);
+  runSummary.getRange("A29").setValue(run.clientIdList.length);
+}
+function generateInvoices(run){
+  for (r=0; r<run.clients.length; r++) run.clients[r].generateInvoice();
+  makeSummary(run);
 }

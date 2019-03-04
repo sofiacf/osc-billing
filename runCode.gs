@@ -1,7 +1,25 @@
-function runInvoices() {
-  setupFolder();
-  var clients = setupClients();
-  for (r=0; r<clients.length; r++){
-    clients[r].generateInvoice();
-  }
-};
+if (!Array.prototype.includes) {
+  Object.defineProperty(Array.prototype, 'includes', {
+    value: function(searchElement, fromIndex) {
+      if (this == null) throw new TypeError('"this" is null or not defined');
+      var o = Object(this), len = o.length >>> 0;
+      if (len === 0) return false;
+      var n = fromIndex | 0;
+      var k = Math.max(n >= 0 ? n : len - Math.abs(n), 0);
+      function sameValueZero(x, y) {
+        return x === y || (typeof x === 'number' && typeof y === 'number' && isNaN(x) && isNaN(y));
+      }
+      while (k < len) {
+        if (sameValueZero(o[k], searchElement)) return true;
+        k++;
+      }
+      return false;
+    }
+  });
+}
+var today;
+today = Utilities.formatDate(new Date(), "GMT-5", "MM/dd/yy");
+var thisRun = new Setup();
+function runInvoices() {  
+  generateInvoices(thisRun);
+}
