@@ -22,4 +22,9 @@ today = Utilities.formatDate(new Date(), "GMT-5", "MM/dd/yy");
 var thisRun = new Setup();
 function runInvoices() {  
   generateInvoices(thisRun);
+  makeSummary(thisRun);
+}
+
+function runPayroll() {
+
 }
