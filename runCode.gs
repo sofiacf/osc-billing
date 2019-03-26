@@ -1,30 +1,24 @@
-if (!Array.prototype.includes) {
-  Object.defineProperty(Array.prototype, 'includes', {
-    value: function(searchElement, fromIndex) {
-      if (this == null) throw new TypeError('"this" is null or not defined');
-      var o = Object(this), len = o.length >>> 0;
-      if (len === 0) return false;
-      var n = fromIndex | 0;
-      var k = Math.max(n >= 0 ? n : len - Math.abs(n), 0);
-      function sameValueZero(x, y) {
-        return x === y || (typeof x === 'number' && typeof y === 'number' && isNaN(x) && isNaN(y));
-      }
-      while (k < len) {
-        if (sameValueZero(o[k], searchElement)) return true;
-        k++;
-      }
-      return false;
+function runInvoices(){
+  billing.run();
+}
+function runPayroll(){
+  run(payroll);
+}
+function run(format){
+  var newSubjects = new Array,
+      folder = getRunFolder(),
+      subjects = getSubs(),
+      charges = getCharges(subjects),
+      details = getDetails(subjects);
+  for (var i = 0; i < subjects.length; i++){
+    if (!details[i]) {
+      newSubjects.push(subjects[i]);
+      continue;
     }
-  });
-}
-var today;
-today = Utilities.formatDate(new Date(), "GMT-5", "MM/dd/yy");
-var thisRun = new Setup();
-function runInvoices() {  
-  generateInvoices(thisRun);
-  makeSummary(thisRun);
-}
-
-function runPayroll() {
-
+    var subject = subjects[i],
+      scharges = charges[i],
+      sdetails = details[i];
+    var sheet = getSheet(subject, sdetails, scharges);
+    printPDF(subject, sheet, folder);
+  }
 }
