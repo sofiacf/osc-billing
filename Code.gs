@@ -16,64 +16,160 @@ if (!Array.prototype.includes) {
     }
   });
 }
-var format,
-    today = Utilities.formatDate(new Date(), "GMT-5", "MM/dd/yy"),
-    master = SpreadsheetApp.getActiveSpreadsheet().getSheets()[1],
-    period = master.getName(),
-    data = master.getDataRange().getValues();
-function runInvoices(){
-  var billing = {
-    subDetailSheet: DriveApp.getFilesByName("CLIENT DATA").next(),
-    directory: "BILLING", subs: "CLIENTS", sColumn: 3,
-    template: function(sub){
-      return (sub == "NIXON") ? DriveApp.getFilesByName("NIXON TEMPLATE").next()
-      : DriveApp.getFilesByName("BILLING TEMPLATE").next();},
-    sheetName: function(sub, det){return sub+" - # "+det.invNum+" - "+today;},
-    Item: function(charge) {
-      var isNixon = (charge[3] == "NIXON"), line = [],
-      els = [0,1,0,0,0,1,1,1,1,1,isNixon,isNixon,0,1];
-      for (var i=0; i<els.length; i++)
-        if (els[i]) line.push(charge[[i]]);
-      return {line: line, amount: charge[13]};},
-    Detail: function(det){
-      return {
-        address: (det[2]) ? [[det[1]], [det[2]], [det[3]], [det[4]]]
-              : [[det[1]], [det[3]], [det[4]],[""]],
-        invNum: [(det[6] + 1) + det[7]]
-      };},
-    formatSheet: function(sub, dets, charges, sheet){
-      var s = SpreadsheetApp.open(sheet).getSheets()[0], total = 0, items = [];
-      for (var i = 0; i < charges.length; i++) {
-        total += charges[i].amount;
-        items.push(charges[i].line);
-      }
-      s.insertRows(16, items.length -1 || 1);
-      SpreadsheetApp.flush();
-      var rs = [s.getRange("A11:A14"), s.getRange(16,1, items.length, items[0].length),
-               s.getRange((sub == "NIXON") ? "H4:H7" : "F4:F7"),
-               s.getRange(17+items.length, items[0].length)];
-      var summary = [[today], dets.invNum, [period], [total]];
-      var vals = [dets.address, items, summary, [[total]]];
-      for (var i = 0; i < rs.length; i++) rs[i].setValues(vals[i]);
-      s.getRange(16,items[0].length, items.length).setNumberFormat('$0.00');
-      rs[1].setFontSize(10).setWrap(true);
-      SpreadsheetApp.flush();
-    }
+var findFolders = function(f){return DriveApp.getFoldersByName(f);},
+    findFiles = function(f){return DriveApp.getFilesByName(f);},
+    noFolder = function(name){return !findFolders(name).hasNext()},
+    noFile = function(name){return !findFiles(name).hasNext()},
+    getData = function(s){return s.getDataRange().getValues();},
+    openSheet = function(s,i){return SpreadsheetApp.open(s).getSheets()[i]},
+    newFolder = function(name, dest){
+      dest.createFolder(name);
+      return dest.findFolders(name).next();
+    },
+    newFile = function(name, dest){
+      dest.createFile(name, dest);
+      return dest.getFilesByName(name).next();
+    },
+    newCopy = function(o, name, dest){
+      o.makeCopy(name, dest);
+      return findFiles(name).next();
+    };
+var stp = {
+  today: Utilities.formatDate(new Date(), "GMT-5", "MM/dd/yy"),
+  master: SpreadsheetApp.getActiveSpreadsheet().getSheets()[1],
+  get period(){return this.master.getName()},
+  get data(){return getData(this.master).slice(4)},
+  subjects: function(config){
+    var subs = new Array, d = this.data, sc = config.sc;
+    for (var i = 4; i < d.length; i++) {
+      var s = config.Subject(d[i][sc]);
+      if (!subs.includes(s)) subs.push(s);
+    };
+    subs.sort();
+    return subs;
+  },
+  indexedSubInfo: function(config){
+    var info = [], ss = openSheet(config.ss,0), o = getData(ss);
+    o.shift();
+    for (var i = 0; i<o.length; i++) info[subs.indexOf(o[i][0])] = o[i];
+    return info;
+  }
+};
+function run(config){
+  var f = config, day = stp.today, subs = stp.subjects(f), data = stp.data;
+  function folder() {
+    var dir = f.directory, n = dir + " " + day;
+    if (findFolders(n).hasNext()) findFolders(n).next().setTrashed(true);
+    findFolders(dir).next().createFolder(n);
+    return findFolders(n).next();
   };
-  format = billing;
-  run();
+  function details() {return stp.indexedSubInfo.map(f.Detail);};
+  function charges(){
+    var c = [], d = data, sc = f.sColumn;
+    for (var i = 0; i<d.length; i++)
+      c[subs.indexOf(d[i][sc])] = (c[subs.indexOf(d[i][sc])] || []).concat(d[i]);
+    return c;
+  };
+  function printPdf(r){
+    var n = r.name, s = r.format(r.copy), folder = this.folder(),
+      id = SpreadsheetApp.open(s).getSheetId();
+    s.makeCopy(n + "tmp_pdf_copy");
+    var tmp = findFiles(n + "tmp_pdf_copy").next();
+    var url = tmp.getUrl();
+    var x = 'export?exportFormat=pdf&format=pdf&fitw=true&portrait=false&gridlines=false&gid=' + id;
+    url = url.replace('edit?usp=drivesdk', '');
+    var token = ScriptApp.getOAuthToken();
+    var response = UrlFetchApp.fetch(url + x, {headers: {'Authorization': 'Bearer ' + token}});
+    var blob = response.getBlob().setName(n);
+    var newFile = folder.createFile(blob);
+    tempCopy.setTrashed(true);
+  }
+  var newSubs = [], ds = details(), cs = charges();
+  for (var i=0; i<subs.length; i++){
+    if (ds[i]) {
+      Logger.console.log(subs[i]);
+      // var statement = f.Statement(ss[i], ds[i], cs[i]);
+      // printPdf(statement.format(statement.copy);
+    }
+    else newSubs.push(ss[i]);
+  }
+}
+function updateSubjects(config){
+  var f = config, subs = stp.subjects(f), ss = f.sSheet, sf = f.sFolder,
+  st = f.template, d = getData(openSheet(ss,0));
+  for (var i = 0; i < subs.length; i++) {
+    var s = subs[i];
+    var fl = findFolders(s) || newFolder(s,sf);
+    var t = findFiles(s + " TEMPLATE") || newCopy(t, s + " TEMPLATE", fl);
+    var o = openSheet(fl,0);
+    if (r.getRange(4,1,4).getValues()) return;
+    for (var i = 0; i < d.length; i++){
+      if (d[i][0] != s) continue;
+      var detail = f.Detail(d[i]);
+      o.getRange(4,1,4).setValues(detail.address);
+      o.getRange(4,2).setValue(detail.invNum);
+      if (!d[i]) Logger.log(s);
+    };
+  };
+}
+var billing = {
+  nss: "NEW CLIENT DATA",
+  directory: "BILLING", sc: 3, sFolder: findFolders("CLIENTS").next(),
+  sSheet: DriveApp.getFilesByName("CLIENT DATA").next(),
+  template: DriveApp.getFilesByName("BILLING TEMPLATE").next(),
+  Subject: function(name){return {name: name}},
+  Item: function(arr){return {amount: arr[13], line: arr[1].concat(arr.slice(5, (arr[3]=="NIXON") ? 12 : 10), arr[13])};
+                     },
+  Detail: function(arr){return {folderId: arr[arr.length-1],
+                                invNum: [(arr[6] + 1) + arr[7]],
+                                address: (arr[2]) ? arr.slice(1,5) : arr[1].concat(arr[3],arr[4],arr[2])}
+                       },
+  Statement: function(subjects, details, charges){
+    var s = this.Subject(subjects), d = this.Detail(details),
+        c = charges.map(this.Item), fid = d.folderId;
+    if (!fid && !findFolders(sub.name).hasNext())
+    findFolders("CLIENTS").next().createFolder(sub.name);
+    fid = fid || DriveApp.getFoldersByName(sub.name).next().getId();
+    return {
+      name: [s.name, "- #", d.invNum, "-", today].join(" "),
+      template: DriveApp.getFilesByName(s.templateName).next(),
+      get copy() {
+      return newCopy(this.template, this.name, DriveApp.getFolderById(fid));
+    },
+      total: [c.reduce(function(a,b){return a+b})], items: c.map(function(x){return x.line}),
+      format: function(sheet){
+        var s = SpreadsheetApp.open(sheet).getSheets()[0],
+            l = this.items.length, w = this.items[0].length;
+        s.insertRows(16,l);
+        SpreadsheetApp.flush();
+        var summary = [[today], d.invNum, [period], this.total],
+            vals = [d.address, this.items, summary, [this.total]],
+            rs = [s.getRange(4, 1, 4), s.getRange(16,1,l,w),
+                  s.getRange(4, w-1, 4), s.getRange(17+l,w)];
+        for (var i = 0; i < rs.length; i++) rs[i].setValues(vals[i]);
+        s.getRange(16, w, l).setNumberFormat('$0.00');
+        rs[1].setFontSize(10).setWrap(true);
+        SpreadsheetApp.flush();
+        return sheet;
+      }
+    }
+  }
+}
+function runInvoices(){
+  run(billing);
 }
 function runPayroll(){
   var payroll = {
-    subDetailSheet: DriveApp.getFilesByName("RIDER DATA").next(),
-    directory: "PAYROLL", subs: "RIDERS", sColumn: 12,
-    template: function(na){
-      return DriveApp.getFilesByName("PAYROLL TEMPLATE").next();},
-    sheetName: function(sub, na){return sub+" Payroll Report: " + today;},
-    Item: function(charge) {
+    directory: "PAYROLL", sColumn: 12,
+    get subsSheet() {return DriveApp.getFilesByName("RIDER DATA").next()},
+    Subject: function(name){return {name: name}},
+    Item: function(arr) {
       var els = [1, 3, 5, 6, 7, 8, 9, 12, 13, 14], line = [];
       for (var i=0; i<els.length; i++) line.push(charge[els[i]]);
       return {line: line, amount: charge[14]};},
+    template: function(na){
+      return DriveApp.getFilesByName("PAYROLL TEMPLATE").next();},
+    sheetName: function(sub, na){return sub+" Payroll Report: " + today;},
     Detail: function(info){
       return {
         address: (info[2]) ? [[info[1]], [info[2]], [info[3]], [info[4]]]
@@ -86,7 +182,7 @@ function runPayroll(){
         total += charges[i].amount;
         items.push(charges[i].line);
       }
-      s.insertRows(16, items.length -1 || 1);
+      s.insertRows(16, items.length -1 || 2);
       SpreadsheetApp.flush();
       var ranges = [s.getRange("A11:A14"), //address
                     s.getRange(16,1, items.length, items[0].length), //items
@@ -100,103 +196,13 @@ function runPayroll(){
       SpreadsheetApp.flush();
     }
   }
-  format = payroll;
   run(payroll);
 }
-function run(){
-  var newSubjects = new Array,
-      folder = getRunFolder(),
-      subjects = getSubs(),
-      charges = getCharges(subjects),
-      details = getDetails(subjects);
-  for (var i = 0; i < subjects.length; i++){
-    if (!details[i]) {
-      newSubjects.push(subjects[i]);
-      continue;
-    }
-    var subject = subjects[i],
-      scharges = charges[i],
-      sdetails = details[i];
-    var sheet = getSheet(subject, sdetails, scharges);
-    printPDF(subject, sheet, folder);
-  }
-}
 
-//   var menu = SpreadsheetApp.getUi().createAddonMenu();
-//   if (e && e.authMode == ScriptApp.AuthMode.NONE) {
-//     menu.addItem('Run invoices', 'runInvoices');
-//     menu.addItem('Run payroll', 'runPayroll');
-//   }
-//   menu.addToUi();
-// }
-function getRunFolder(){
-  const f = format.directory, fName = f + " " + today;
-  try {DriveApp.getFoldersByName(fName).next().setTrashed(true);}
-  catch(err) {Logger.log("No folder to delete");}
-  finally {DriveApp.getFoldersByName(f).next().createFolder(fName);}
-  return DriveApp.getFoldersByName(fName).next();
-}
-function getSubs(){
-  var subs = new Array;
-  for (var i = 4; i < data.length; i++) {
-    var datum = data[i][format.sColumn];
-    if (!subs.includes(datum)) subs.push(datum);
-  }
-  return subs;
-}
-function getDetails(subs){
-  var details = new Array,
-    infoSheet = SpreadsheetApp.open(format.subDetailSheet).getSheets()[0],
-    sInfo = infoSheet.getDataRange().getValues();
-  sInfo.shift();
-  for (var i = 0; i<subs.length; i++) {
-    details[subs.indexOf(sInfo[i][0])] = format.Detail(sInfo[i]);
-    if (!sInfo[i][sInfo[i].length-1]) {
-      if (DriveApp.getFoldersByName(sInfo[i][0]).hasNext()){
-        var r = infoSheet.getRange(i+2, sInfo[i].length);
-        r.setValue(DriveApp.getFoldersByName(sInfo[i][0]).next().getId());
-      }
-    }
-  }
-  return details;
-}
-function getCharges(subs) {
-  var charges = new Array;
-  for (var i = 4; i<data.length; i++) {
-    var charge = format.Item(data[i]),
-        index = subs.indexOf(data[i][format.sColumn]);
-    if (charges[index]) charges[index].push(charge);
-    else charges[index] = [charge];
-  }
-  return charges;
-}
-function getSheet(sub, details, charges){
-  if (details[details.length-1]) {
-    var folder = DriveApp.getFolderById(details[details.length]);
-  }
-  else {
-    if (!DriveApp.getFoldersByName(sub).hasNext())
-      DriveApp.getFoldersByName(format.subs).next().createFolder(sub);
-    var folder = DriveApp.getFoldersByName(sub).next();
-  }
-  const template = format.template(sub), name = format.sheetName(sub, details);
-  template.makeCopy(name, folder);
-  var sheet = DriveApp.getFilesByName(name).next();
-  format.formatSheet(sub, details, charges, sheet);
-  return sheet;
-}
-function printPDF(sub, sheet, folder) {
-  var id = SpreadsheetApp.open(sheet).getSheetId();
-  sheet.makeCopy(sub + "tmp_pdf_copy");
-  var tempCopy = DriveApp.getFilesByName(sub + "tmp_pdf_copy").next();
-  var url = tempCopy.getUrl();
-  var url_ext = 'export?exportFormat=pdf&format=pdf&fitw=true&portrait=false&gridlines=false&gid=' + id;
-  url = url.replace('edit?usp=drivesdk', '');
-  var token = ScriptApp.getOAuthToken();
-  var response = UrlFetchApp.fetch(url + url_ext, {headers: {'Authorization': 'Bearer ' + token}});
-  var blob = response.getBlob().setName(sheet.getName());
-  var newFile = folder.createFile(blob);
-  tempCopy.setTrashed(true);
+function migrate(){
+  var f = billing, newSubSheet = SpreadsheetApp.create(f.nss),
+  d = openSheet(f.sSheet,0), subs = d.getRange(2,1,d.getLastRow()-1);
+  newSubSheet.getRange(1,1,subs.length).setValues(subs);
 }
 
 //function Setup(){

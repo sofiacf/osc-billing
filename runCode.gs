@@ -3,5 +3,7 @@ function onOpen(e) {
   ui.createMenu("Accounting")
     .addItem('Run invoices', 'runInvoices')
     .addItem('Run payroll', 'runInvoices')
+    .addSeparator()
+    .addItem('Update subjects', 'updateSubjects')
     .addToUi();
 }
