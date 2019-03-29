@@ -24,7 +24,7 @@ var findFolders = function(f){return DriveApp.getFoldersByName(f);},
     openSheet = function(s,i){return SpreadsheetApp.open(s).getSheets()[i]},
     newFolder = function(name, dest){
       dest.createFolder(name);
-      return dest.findFolders(name).next();
+      return findFolders(name).next();
     },
     newFile = function(name, dest){
       dest.createFile(name, dest);
@@ -116,20 +116,22 @@ var billing = {
   nss: "NEW CLIENT DATA",
   directory: "BILLING", sc: 3, sFolder: findFolders("CLIENTS").next(),
   sSheet: DriveApp.getFilesByName("CLIENT DATA").next(),
+  addressRange: function(sheet){return sheet.getRange(4,1,4)},
+  address: function(arr){return [[arr[1]]].concat((arr[2]) ? [[arr[2]],[arr[3]],[arr[4]]] : [[arr[3]],[arr[4]],[arr[2]]])},
   template: DriveApp.getFilesByName("BILLING TEMPLATE").next(),
   Subject: function(name){return {name: name}},
   Item: function(arr){return {amount: arr[13], line: arr[1].concat(arr.slice(5, (arr[3]=="NIXON") ? 12 : 10), arr[13])};
                      },
-  Detail: function(arr){return {folderId: arr[arr.length-1],
-                                invNum: [(arr[6] + 1) + arr[7]],
-                                address: (arr[2]) ? arr.slice(1,5) : arr[1].concat(arr[3],arr[4],arr[2])}
+  Detail: function(arr){Logger.log(arr);
+                        return {folderId: arr[arr.length-1],
+                                invNum: [(arr[6]) + arr[7]],
+                                address: (arr[2]) ? [arr.slice(1,5)] : [arr[1]].concat([arr[3]],[arr[4]],[arr[2]])}
                        },
   Statement: function(subjects, details, charges){
     var s = this.Subject(subjects), d = this.Detail(details),
         c = charges.map(this.Item), fid = d.folderId;
-    if (!fid && !findFolders(sub.name).hasNext())
-    findFolders("CLIENTS").next().createFolder(sub.name);
-    fid = fid || DriveApp.getFoldersByName(sub.name).next().getId();
+    if (!fid && noFolder(s.name))findFolders("CLIENTS").next().createFolder(s.name);
+    fid = fid || DriveApp.getFoldersByName(s.name).next().getId();
     return {
       name: [s.name, "- #", d.invNum, "-", today].join(" "),
       template: DriveApp.getFilesByName(s.templateName).next(),
@@ -182,7 +184,7 @@ function runPayroll(){
         total += charges[i].amount;
         items.push(charges[i].line);
       }
-      s.insertRows(16, items.length -1 || 2);
+      if (items>1) s.insertRows(16, items.length -1);
       SpreadsheetApp.flush();
       var ranges = [s.getRange("A11:A14"), //address
                     s.getRange(16,1, items.length, items[0].length), //items
@@ -200,9 +202,21 @@ function runPayroll(){
 }
 
 function migrate(){
-  var f = billing, newSubSheet = SpreadsheetApp.create(f.nss),
-  d = openSheet(f.sSheet,0), subs = d.getRange(2,1,d.getLastRow()-1);
-  newSubSheet.getRange(1,1,subs.length).setValues(subs);
+  var f = billing, d = openSheet(f.sSheet,0), subs = d.getRange(1,1,d.getLastRow()).getValues();
+  var sSheet = (findFiles(f.nss).hasNext()) ? openSheet(findFiles(f.nss).next(),0)
+  : SpreadsheetApp.create(f.nss).getSheets()[0];
+  sSheet.getRange(1,1,subs.length).setValues(subs);
+  var data = getData(d), ids = [], runInfo = [];
+  for (var i=0; i<data.length; i++){
+    var a = data[i], tn = a[0] + " TEMPLATE";
+    var fl = (!noFolder(a[0])) ? findFolders(a[0]).next() : newFolder(a[0], f.sFolder);
+    var t = (!noFile(tn)) ? findFiles(tn).next() : newCopy(f.template, tn, fl);
+    ids.push([[fl.getId()], [t.getId()]]);
+    runInfo.push([[a[6]],[a[7]],[a[5]]]);
+    f.addressRange(openSheet(t,0)).setValues(f.address(a));
+  }
+  sSheet.getRange(1,2,subs.length,2).setValues(ids);
+  sSheet.getRange(1,3,subs.length,3).setValues(runInfo);
 }
 
 //function Setup(){
