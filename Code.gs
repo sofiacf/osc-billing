@@ -1,3 +1,6 @@
+//WARNING!!
+//Before implementing, you MUST edit client information file.
+//Remove header row and move "attn" line after city/state!
 if (!Array.prototype.includes) {
   Object.defineProperty(Array.prototype, 'includes', {
     value: function(searchElement, fromIndex) {
@@ -40,17 +43,14 @@ var stp = {
   get period(){return this.master.getName()},
   get data(){return getData(this.master).slice(4)},
   subjects: function(config){
-    var subs = new Array, d = this.data, sc = config.sc;
-    for (var i = 4; i < d.length; i++) {
-      var s = config.Subject(d[i][sc]);
-      if (!subs.includes(s)) subs.push(s);
-    };
-    subs.sort();
-    return subs;
+    var seen = {}, d = this.data, sc = this.sc, s = config.Subject;
+    var subs = d.filter(function(x){
+      return seen.hasOwnProperty(x[sc]) ? false : (seen[x[sc]] = true);});
+    return subs.map(function(x){return s(x[sc])}).sort(); 
   },
   indexedSubInfo: function(config){
     var info = [], ss = openSheet(config.ss,0), o = getData(ss);
-    o.shift();
+    
     for (var i = 0; i<o.length; i++) info[subs.indexOf(o[i][0])] = o[i];
     return info;
   }
@@ -113,20 +113,19 @@ function updateSubjects(config){
   };
 }
 var billing = {
-  nss: "NEW CLIENT DATA",
-  directory: "BILLING", sc: 3, sFolder: findFolders("CLIENTS").next(),
-  sSheet: DriveApp.getFilesByName("CLIENT DATA").next(),
-  addressRange: function(sheet){return sheet.getRange(4,1,4)},
-  address: function(arr){return [[arr[1]]].concat((arr[2]) ? [[arr[2]],[arr[3]],[arr[4]]] : [[arr[3]],[arr[4]],[arr[2]]])},
+  nss: "NEW CLIENT DATA", directory: "BILLING", sc: 3,
+  sFolder: findFolders("CLIENTS").next(), sSheet: DriveApp.getFilesByName("CLIENT DATA").next(),
+  addressRange: function(sheet){return sheet.getRange(11,1,4)},
+  address: function(arr){return [arr.slice(1,5)]},
   template: DriveApp.getFilesByName("BILLING TEMPLATE").next(),
   Subject: function(name){return {name: name}},
-  Item: function(arr){return {amount: arr[13], line: arr[1].concat(arr.slice(5, (arr[3]=="NIXON") ? 12 : 10), arr[13])};
-                     },
-  Detail: function(arr){Logger.log(arr);
-                        return {folderId: arr[arr.length-1],
-                                invNum: [(arr[6]) + arr[7]],
-                                address: (arr[2]) ? [arr.slice(1,5)] : [arr[1]].concat([arr[3]],[arr[4]],[arr[2]])}
-                       },
+  Item: function(arr){
+    return {amount: arr[13], line: arr[1].concat(arr.slice(5, (arr[3]=="NIXON") ? 12 : 10), arr[13])};
+  },
+  Detail: function(arr){
+    return {folderId: arr[arr.length-1], invNum: [arr[6] + arr[7]],
+      address: [arr.slice(1,5)]};
+  },
   Statement: function(subjects, details, charges){
     var s = this.Subject(subjects), d = this.Detail(details),
         c = charges.map(this.Item), fid = d.folderId;
@@ -200,17 +199,17 @@ function runPayroll(){
   }
   run(payroll);
 }
-
-function migrate(){
-  var f = billing, d = openSheet(f.sSheet,0), subs = d.getRange(1,1,d.getLastRow()).getValues();
-  var sSheet = (findFiles(f.nss).hasNext()) ? openSheet(findFiles(f.nss).next(),0)
-  : SpreadsheetApp.create(f.nss).getSheets()[0];
+var config = billing;
+function updateSubjects(){
+  var f = config, d = openSheet(f.sSheet,0), subs = d.getRange(1,1,d.getLastRow()).getValues();
+  var sSheet = (noFile(f.nss)) ? SpreadsheetApp.create(f.nss).getSheets()[0]
+  : openSheet(findFiles(f.nss).next(),0);
   sSheet.getRange(1,1,subs.length).setValues(subs);
   var data = getData(d), ids = [], runInfo = [];
   for (var i=0; i<data.length; i++){
     var a = data[i], tn = a[0] + " TEMPLATE";
-    var fl = (!noFolder(a[0])) ? findFolders(a[0]).next() : newFolder(a[0], f.sFolder);
-    var t = (!noFile(tn)) ? findFiles(tn).next() : newCopy(f.template, tn, fl);
+    var fl = (noFolder(a[0])) ? newFolder(a[0], f.sFolder) : findFolders(a[0]).next();
+    var t = (noFile(tn)) ? newCopy(f.template, tn, fl) : findFiles(tn).next();
     ids.push([[fl.getId()], [t.getId()]]);
     runInfo.push([[a[6]],[a[7]],[a[5]]]);
     f.addressRange(openSheet(t,0)).setValues(f.address(a));
