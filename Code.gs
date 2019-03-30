@@ -1,3 +1,6 @@
+//WARN ING!!
+//Before implementing, you MUST edit client information file.
+//Remove header row and move "attn" line after city/state!
 if (!Array.prototype.includes) {
   Object.defineProperty(Array.prototype, 'includes', {
     value: function(searchElement, fromIndex) {
@@ -40,17 +43,14 @@ var stp = {
   get period(){return this.master.getName()},
   get data(){return getData(this.master).slice(4)},
   subjects: function(config){
-    var subs = new Array, d = this.data, sc = config.sc;
-    for (var i = 4; i < d.length; i++) {
-      var s = config.Subject(d[i][sc]);
-      if (!subs.includes(s)) subs.push(s);
-    };
-    subs.sort();
-    return subs;
+    var seen = {}, d = this.data, sc = this.sc, s = config.Subject;
+    var subs = d.filter(function(x){
+      return seen.hasOwnProperty(x[sc]) ? false : (seen[x[sc]] = true);});
+    return subs.map(function(x){return s(x[sc])}).sort();
   },
   indexedSubInfo: function(config){
     var info = [], ss = openSheet(config.ss,0), o = getData(ss);
-    o.shift();
+
     for (var i = 0; i<o.length; i++) info[subs.indexOf(o[i][0])] = o[i];
     return info;
   }
@@ -137,7 +137,8 @@ var billing = {
       get copy() {
       return newCopy(this.template, this.name, DriveApp.getFolderById(fid));
     },
-      total: [c.reduce(function(a,b){return a+b})], items: c.map(function(x){return x.line}),
+      total: [c.reduce(function(a,b){return a+b})],
+      items: c.map(function(x){return x.line}),
       format: function(sheet){
         var s = SpreadsheetApp.open(sheet).getSheets()[0],
             l = this.items.length, w = this.items[0].length;
@@ -199,17 +200,19 @@ function runPayroll(){
   }
   run(payroll);
 }
-
-function migrate(){
-  var f = billing, d = openSheet(f.sSheet,0), subs = d.getRange(1,1,d.getLastRow()).getValues();
-  var sSheet = (findFiles(f.nss).hasNext()) ? openSheet(findFiles(f.nss).next(),0)
-  : SpreadsheetApp.create(f.nss).getSheets()[0];
+var config = billing;
+function updateSubjects(){
+  var f = config, d = openSheet(f.sSheet,0),
+  subs = d.getRange(1,1,d.getLastRow()).getValues();
+  var sSheet = (noFile(f.nss)) ? SpreadsheetApp.create(f.nss).getSheets()[0]
+  : openSheet(findFiles(f.nss).next(),0);
   sSheet.getRange(1,1,subs.length).setValues(subs);
   var data = getData(d), ids = [], runInfo = [];
   for (var i=0; i<data.length; i++){
     var a = data[i], tn = a[0] + " TEMPLATE";
-    var fl = (!noFolder(a[0])) ? findFolders(a[0]).next() : newFolder(a[0], f.sFolder);
-    var t = (!noFile(tn)) ? findFiles(tn).next() : newCopy(f.template, tn, fl);
+    var fl = (noFolder(a[0])) ? newFolder(a[0], f.sFolder)
+    : findFolders(a[0]).next();
+    var t = (noFile(tn)) ? newCopy(f.template, tn, fl) : findFiles(tn).next();
     ids.push([[fl.getId()], [t.getId()]]);
     runInfo.push([[a[6]],[a[7]],[a[5]]]);
     f.addressRange(openSheet(t,0)).setValues(f.address(a));
