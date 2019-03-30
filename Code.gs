@@ -116,14 +116,13 @@ var billing = {
   nss: "NEW CLIENT DATA",
   directory: "BILLING", sc: 3, sFolder: findFolders("CLIENTS").next(),
   sSheet: DriveApp.getFilesByName("CLIENT DATA").next(),
-  addressRange: function(sheet){return sheet.getRange(4,1,4)},
+  addressRange: function(sheet){return sheet.getRange(11,1,4)},
   address: function(arr){return [[arr[1]]].concat((arr[2]) ? [[arr[2]],[arr[3]],[arr[4]]] : [[arr[3]],[arr[4]],[arr[2]]])},
   template: DriveApp.getFilesByName("BILLING TEMPLATE").next(),
   Subject: function(name){return {name: name}},
   Item: function(arr){return {amount: arr[13], line: arr[1].concat(arr.slice(5, (arr[3]=="NIXON") ? 12 : 10), arr[13])};
                      },
-  Detail: function(arr){Logger.log(arr);
-                        return {folderId: arr[arr.length-1],
+  Detail: function(arr){return {folderId: arr[arr.length-1],
                                 invNum: [(arr[6]) + arr[7]],
                                 address: (arr[2]) ? [arr.slice(1,5)] : [arr[1]].concat([arr[3]],[arr[4]],[arr[2]])}
                        },
