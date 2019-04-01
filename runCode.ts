@@ -1,4 +1,4 @@
-function onOpen(e) {
+function onOpen(_e: any) {
   var ui = SpreadsheetApp.getUi();
   ui.createMenu("Accounting")
     .addItem('Run invoices', 'runInvoices')

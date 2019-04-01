@@ -1,5 +1,10 @@
 //Remove header row and move "attn" line after city/state!
 //FINISH UPDATESUBJECT or MAKE NEW LIST TO SAVE TIME OPENING FOLDER
+function findFolders(n: string){return DriveApp.getFoldersByName(n);}
+function findFiles(n: string){return DriveApp.getFilesByName(n);}
+function noFolder(n: string){return !findFolders(n).hasNext()}
+function noFile(n: string){return !findFiles(n).hasNext()}
+function open(s: GoogleAppsScript.Drive.File){return SpreadsheetApp.open(s)}
 function printPdf(s: GoogleAppsScript.Drive.File, f: GoogleAppsScript.Drive.Folder){
   let n = s.getName(), tmp = s.makeCopy(n + "tmp_pdf_copy");
   let url = tmp.getUrl(), id = open(s).getSheetId();
@@ -11,11 +16,6 @@ function printPdf(s: GoogleAppsScript.Drive.File, f: GoogleAppsScript.Drive.Fold
   f.createFile(r);
   tmp.setTrashed(true);
 }
-function findFolders(n: string){return DriveApp.getFoldersByName(n);}
-function findFiles(n: string){return DriveApp.getFilesByName(n);}
-function noFolder(n: string){return !findFolders(n).hasNext()}
-function noFile(n: string){return !findFiles(n).hasNext()}
-function open(s: GoogleAppsScript.Drive.File){return SpreadsheetApp.open(s)}
 const today = Utilities.formatDate(new Date(), "GMT-5", "MM/dd/yy");
 const master = SpreadsheetApp.getActiveSpreadsheet().getSheets()[1];
 let period = master.getName(), data = master.getDataRange().getValues().slice(4);
@@ -87,8 +87,14 @@ class Rider extends Subject{
   item(i: any[]): any[] {return [1,3,5,6,7,8,9,12,13,14].map(x => i[x])}
   constructor(a: any[]){super(a)}
 }
-let billing = new Format("BILLING", 3, (x: any[])=> new Client(x));
-let payroll = new Format("PAYROLL", 12, (x: any[]) => new Rider(x));
+function runInvoices(){
+  let billing = new Format("BILLING", 3, (x: any[])=> new Client(x));
+  billing.run();
+}
+function runPayroll(){
+  let payroll = new Format("PAYROLL", 12, (x: any[]) => new Rider(x));
+  payroll.run();
+}
 function updateSub(s: any[]){Logger.log(s);}// FIXME
 // function updateSubjects(){
   //WRITE MIGRATE FUNCTION FOR SUBJECT INFO SHEET, IMPLEMENT THERE
