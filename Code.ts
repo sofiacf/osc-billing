@@ -11,11 +11,11 @@ function printPdf(s: GoogleAppsScript.Drive.File, f: GoogleAppsScript.Drive.Fold
   f.createFile(r);
   tmp.setTrashed(true);
 }
-function findFolders(n: string){return DriveApp.getFoldersByName(n);};
-function findFiles(n: string){return DriveApp.getFilesByName(n);};
-function noFolder(n: string){return !findFolders(n).hasNext()};
-function noFile(n: string){return !findFiles(n).hasNext()};
-function open(s: GoogleAppsScript.Drive.File){return SpreadsheetApp.open(s)};
+function findFolders(n: string){return DriveApp.getFoldersByName(n);}
+function findFiles(n: string){return DriveApp.getFilesByName(n);}
+function noFolder(n: string){return !findFolders(n).hasNext()}
+function noFile(n: string){return !findFiles(n).hasNext()}
+function open(s: GoogleAppsScript.Drive.File){return SpreadsheetApp.open(s)}
 const today = Utilities.formatDate(new Date(), "GMT-5", "MM/dd/yy");
 const master = SpreadsheetApp.getActiveSpreadsheet().getSheets()[1];
 let period = master.getName(), data = master.getDataRange().getValues().slice(4);
