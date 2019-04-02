@@ -18,26 +18,27 @@ function printPdf(s: GoogleAppsScript.Drive.File, f: GoogleAppsScript.Drive.Fold
 }
 const today = Utilities.formatDate(new Date(), "GMT-5", "MM/dd/yy");
 const master = SpreadsheetApp.getActiveSpreadsheet().getSheets()[1];
-let period = master.getName(), data = master.getDataRange().getValues().slice(4);
+let period = master.getName(), data: Array<Array<any>> = master.getDataRange().getValues().slice(4);
 class Format{
-  n: string; ss: GoogleAppsScript.Drive.File;
-  folder: GoogleAppsScript.Drive.Folder; st: GoogleAppsScript.Drive.File;
-  si: Object[][]; sc: number; fn: string; sub: any;
+  n: string; ss: GoogleAppsScript.Drive.File; folder: GoogleAppsScript.Drive.Folder;
+  st: GoogleAppsScript.Drive.File; si: Object[][]; sc: number; fn: string; sub: any; h: Array<any>;
   constructor(n: string, sc: number, sub: CallableFunction){
-    this.n = n, this.ss = findFiles(this.n + " DATA").next(), this.sc = sc;
-    this.sub = sub, this.folder = findFolders(n).next(),
-    this.si = open(this.ss).getSheets()[0].getDataRange().getValues();
+    this.n = n; this.sc = sc; this.sub = sub;
+    this.folder = findFolders(n).next();
+    this.ss = findFiles(n + " DATA").next();
+    this.si = open(this.ss).getDataRange().getValues();
     this.st = findFiles(this.n + " SUMMARY TEMPLATE").next();
+    this.h = open(this.ss).getRangeByName("headers").getValues()[0];
   }
-  subjects(){
-    let ss = {};
-    this.si.forEach((x: Array<any>) =>{ss[x[0]] = new this.sub(x)});
-    data.forEach((x: Array<any>) => {
-      if (!ss.hasOwnProperty(x[this.sc])) ss[x[this.sc]] = updateSub(x);
-      ss[x[this.sc]].items.push(ss[x[this.sc]].item([x]));
-    });
-    return ss;
-  }
+  activeSubs(){return Array.from(new Set(data.map((x) => x[this.sc])));}
+  knownSubs(){return this.si.map(x=>[x[0], new Map(x.map((y,j)=>[this.h[j],y]))]);}
+  updateSub(sid: string){
+    let a = this.h.map(x=>[]);
+    a[0] = [sid]; ///FIXME - ADD NEW FOLDER AND TEMPLATE
+    open(this.ss).appendRow(a);
+    return new Map(a.map((x,i)=>[this.h[i],x]));
+  } ///WHAT THE HECK IS DOWNLEVEL ITERATION ??
+  matchActiveToKnown(){for (var key of new Map(this.knownSubs.keys())}
   run(){
     function folder() {
       var n = this.fName + " " + today;
