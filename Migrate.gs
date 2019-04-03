@@ -1,3 +1,4 @@
+//Remove header row and move "attn" line after city/state!
 //Check if there's a template. If there is, copy a new one. If not, make a new one with name.
 //Check if the template has address, etc. If not, add to sheet. Remove line.
 function findFolders(n){return DriveApp.getFoldersByName(n);}
