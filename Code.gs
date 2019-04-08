@@ -1,20 +1,23 @@
 function reset(){
-  SpreadsheetApp.getActive().getSheetByName("SETUP").clear();
-  onOpen(0);
-}
-function setFormat(){
-  //Update menus
   const workbook = SpreadsheetApp.getActiveSpreadsheet();
-  workbook.removeMenu(menuName);
-  menuName = format.name;
-  workbook.addMenu(menuName, format.menus);
-  
+  workbook.getSheetByName("SETUP").clear();
+  workbook.getSheets().forEach(function(sheet){if (sheet.getName() != "SETUP") sheet.hideSheet();});
+  setup();
+}
+function getActiveSubjects(){
+  const inputFile = DriveApp.getFilesByName('OSC MASTER INPUT').next();
+  const inputSheet = SpreadsheetApp.open(inputFile).getSheets()[1];
+  const input = inputSheet.getDataRange().getValues().slice(3);
+  const subjects = input.map(function (el){return el[format.subject.column];});
+  return subjects.filter(function (e,i,a){return (i == a.indexOf(e));}).sort();
+}
+function setup(){
   //Setup values
-  const actives = getActiveSubjects();
+  const workbook = SpreadsheetApp.getActiveSpreadsheet();
+  const actives = getActiveSubjects(format.name);
   const knowns = workbook.getSheetByName(format.subject.name).getDataRange().getValues();
   const knownids = knowns.map(function(el){return el[0];});
   const matchColumns = format.headers.map(function(el){return knowns[0].indexOf(el);});
-  
   //Update setup sheet
   const setup = workbook.getSheetByName('SETUP');
   const values = [format.headers].concat(actives.map(function(sub){
@@ -24,34 +27,17 @@ function setFormat(){
   }));
   setup.getRange(1,1, values.length, format.headers.length).setValues(values);
   setup.getRange(1,1,1,format.headers.length).setFontWeight('bold');
+  actives.forEach(function(sub){
+    if (workbook.getSheets().some(function(sheet){return sheet.getName() == sub})) {
+      workbook.getSheetByName(sub).showSheet();
+    } else {workbook.insertSheet(sub);}
+  });
 }
-
-function showSidebar() {
-  var html = HtmlService.createHtmlOutputFromFile('sidebar')
-      .setTitle(format.name)
-      .setWidth(300);
-  SpreadsheetApp.getUi().showSidebar(html);
-}
-
 function runReports(){
-  const actives = getActiveSubjects();
-  const workbook = SpreadsheetApp.getActive().getSheetByName('SETUP');
+  const actives = getActiveSubjects(format.name);
+  const workbook = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('SETUP');
   const working = workbook.getRange(2,1,format.headers.length, actives.length).getValues();
   const readys = working.filter(function(el){return el[1] == 'READY'});
-  
-}
-
-function getPayroll() {
-  var menus = [
-    {name: 'Run payroll', functionName: 'runPayroll'},
-    {name: 'Post payroll', functionName: 'postPayroll'},
-    {name: 'Switch to billing', functionName: 'getBilling'}
-  ];
-  var workbook = SpreadsheetApp.getActive();
-  workbook.removeMenu('Accounting');
-  workbook.addMenu('Payroll', menus);
-  format = {name: 'PAYROLL', subject: {name: 'COURIERS', column: 12}};
-  formatSheet(payroll);
 }
 
 
