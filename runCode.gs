@@ -5,16 +5,10 @@ function onOpen() {
   .addSeparator().addItem('RUN','runReports').addItem('POST', 'postReports').addToUi();
 }
 function getBilling() {
-  var billing = {
-    name: 'BILLING',
-    headers: ['ACTIVE CLIENTS', 'STATUS', 'BILL NUMBER', 'TOTAL'],
-    subject: {name: 'CLIENTS', column: 3}
-  };
   format = billing;
   setup();
 }
 function getPayroll() {
-  var payroll = {name: 'PAYROLL', subject: {name: 'COURIERS', column: 12}};
   format = payroll;
   setup();
 }

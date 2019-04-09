@@ -1,43 +1,39 @@
-function reset(){
-  const workbook = SpreadsheetApp.getActiveSpreadsheet();
-  workbook.getSheetByName("SETUP").clear();
-  workbook.getSheets().forEach(function(sheet){if (sheet.getName() != "SETUP") sheet.hideSheet();});
-  setup();
-}
-function getActiveSubjects(){
-  const inputFile = DriveApp.getFilesByName('OSC MASTER INPUT').next();
-  const inputSheet = SpreadsheetApp.open(inputFile).getSheets()[1];
-  const input = inputSheet.getDataRange().getValues().slice(3);
-  const subjects = input.map(function (el){return el[format.subject.column];});
-  return subjects.filter(function (e,i,a){return (i == a.indexOf(e));}).sort();
-}
+var ss = SpreadsheetApp.getActiveSpreadsheet();
+var billing = {name: 'BILLING', subject: 'CLIENTS', columns: {subject: 3, total: 13},
+    headers: ['ACTIVE CLIENTS', 'STATUS', 'BILL NUMBER', 'TOTAL']};
+var payroll = {name: 'PAYROLL', subject: {name: 'COURIERS', column: 12}};
+var formats = [billing, payroll];
 function setup(){
-  //Setup values
-  const workbook = SpreadsheetApp.getActiveSpreadsheet();
-  const actives = getActiveSubjects(format.name);
-  const knowns = workbook.getSheetByName(format.subject.name).getDataRange().getValues();
+  //Clear sheet
+  const setup = ss.getSheetByName("SETUP").clear();
+  const input = ss.getSheetByName("INPUT").clear();
+  ss.getSheets().forEach(function(sheet){if (["SETUP", "INPUT", 'CLIENTS', 'COURIERS'].indexOf(sheet.getName()) < 0) ss.deleteSheet(sheet);});
+  //Calculate initial setup
+  const data = SpreadsheetApp.open(DriveApp.getFilesByName('OSC MASTER INPUT').next()).getSheets()[1].getSheetValues(1,1,-1,-1).slice(3);
+  const actives = data.map(function (el){
+    return el[format.columns.subject];}).filter(function (e,i,a){
+    return (i == a.indexOf(e));}).sort();
+  const knowns = ss.getSheetByName(format.subject).getSheetValues(1, 1, -1, -1);
   const knownids = knowns.map(function(el){return el[0];});
-  const matchColumns = format.headers.map(function(el){return knowns[0].indexOf(el);});
-  //Update setup sheet
-  const setup = workbook.getSheetByName('SETUP');
+  const fields = format.headers.map(function(el){return knowns[0].indexOf(el);});
   const values = [format.headers].concat(actives.map(function(sub){
     var arr = [sub].concat(["READY"]), index = knownids.indexOf(sub);
     if (index < 0) return arr.concat(new Array(format.headers.length-2));
-    else return arr.concat(matchColumns.slice(2).map(function(el){return el > -1 ? knowns[index][el] : "";}));    
+    else return arr.concat(fields.slice(2).map(function(el){return el > -1 ? knowns[index][el] : "";}));    
   }));
-  setup.getRange(1,1, values.length, format.headers.length).setValues(values);
+  //Format spreadsheet
+  ss.getSheetByName("INPUT").clear().showSheet().getRange(1, 1, data.length, data[0].length).setValues(data);
+  setup.getRange(1,1, values.length, format.headers.length).setValues(values)
   setup.getRange(1,1,1,format.headers.length).setFontWeight('bold');
-  actives.forEach(function(sub){
-    if (workbook.getSheets().some(function(sheet){return sheet.getName() == sub})) {
-      workbook.getSheetByName(sub).showSheet();
-    } else {workbook.insertSheet(sub);}
-  });
 }
 function runReports(){
-  const actives = getActiveSubjects(format.name);
-  const workbook = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('SETUP');
-  const working = workbook.getRange(2,1,format.headers.length, actives.length).getValues();
-  const readys = working.filter(function(el){return el[1] == 'READY'});
+  const setup = ss.getSheetByName('SETUP');
+  const actives = setup.getSheetValues(1, 1, -1, -1);
+  format = (actives[0][0] == "ACTIVE CLIENTS") ? billing : payroll;
+  const working = actives.filter(function(el){return el[1] == 'READY'});
+  working.forEach(function(sub){if (ss.getSheetByName(sub[0]) == null) ss.insertSheet(sub[0])});
+  const data = ss.getSheetByName("INPUT").getSheetValues(1, 1, -1, -1);
+  data.forEach(function(row){ss.getSheetByName(row[format.columns.subject]).appendRow(row);});
 }
 
 
