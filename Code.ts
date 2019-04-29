@@ -24,8 +24,13 @@ function getKnowns(){
   return knowns;
 }
 function runReports(){
-  //for actives
-
+  var actives = dash.getRange(2,4,numSubs).getValues().map(x=>x[0]);
+  actives.forEach(function(sub: string){
+    var name = sub + " - # " + (knowns[sub]["statementNum"] || 1) + " - " + date;
+    if (runFolder.getFilesByName(name).hasNext()) {
+      //do stuff
+    }
+  });
 }
 
 function refresh(){
@@ -49,6 +54,7 @@ function refresh(){
     ss.setNamedRange('priceColumn', inputSheet.getRange(1, 13, numRows)),
     ss.setNamedRange('payoutColumn', inputSheet.getRange(1, 14, numRows));
   }
+  SpreadsheetApp.flush();
   runReports();
 }
 
