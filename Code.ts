@@ -1,88 +1,81 @@
-function getFormat(format: string) {//returns format object (billing or payroll)
-  var billing = { name: "BILLING", sc: 3, tc: 'priceColumn', sub: "CLIENTS" };
-  var payroll = { name: "PAYROLL", sc: 12, tc: 'payoutColumn', sub: "COURIERS" };
-  //TODO: Add data validation by value (eg "BILLING" & "SWITCH TO PAYROLL")
-  return format == "BILLING" ? billing : payroll;
-}
-function getDate(date: Date) { return Utilities.formatDate(date, "GMT-5", "M/d/yy"); }
-
-function refresh(f: { sc: number, tc: string, sub: string }) {
-  var state = dash.getRange("B2").getValue();
-  if (state == "NONE") return;
-  const input = ss.getSheetByName("INPUT");
-  if (state == "INPUT") { //refresh "INPUT" sheet and dash
-    const master = DriveApp.getFilesByName('OSC MASTER INPUT').next();
-    const data = SpreadsheetApp.open(master).getSheets()[1].getSheetValues(4, 2, -1, -1);
-    const rows = data.length;
-    input.clear().getRange(1, 1, rows, data[0].length).setValues(data).sort(f.sc);
-    ss.setNamedRange('priceColumn', input.getRange(1, 13, rows));
-    ss.setNamedRange('payoutColumn', input.getRange(1, 14, rows));
+class Subject {
+  items = [];
+  props = {};
+  state: string; total: number;
+  constructor(sub: any[]) {
+    this.state = sub[3];
+    this.total = sub[1];
   }
-  ss.setNamedRange('subs', ss.getSheetByName(f.sub).getRange("A2:A"));
-  ss.setNamedRange('tc', ss.getRangeByName(f.tc));
-  ss.setNamedRange('sc', input.getRange(1, f.sc, input.getLastRow()));
-  dash.getRange("E2:E").clear().clearDataValidations();
-  var rule = SpreadsheetApp.newDataValidation().requireValueInList(["RUN", "PRINT", "POST", "SKIP"], true).build();
-  var numRows: any = dash.getRange("B8").getValue();
-  dash.getRange(2, 5, numRows).setDataValidation(rule);
-}
-
-function getKnowns(f: { sub: string }) {//pull data from subject sheet
-  const data: any[][] = ss.getSheetByName(f.sub).getDataRange().getValues();
-  const props = data.shift();
-  const knowns = {};
-  data.forEach(d => {
-    knowns[d[0]] = {};
-    props.forEach((p, i) => knowns[d[0]][p] = d[i]);
-  });
-  return knowns;
-}
-function getItems(f: { sc: number }, actives: any[]) {//pull data from input
-  const items = {};
-  actives.forEach(a => items[a[0]] = []);
-  const input: any[][] = ss.getSheetByName("INPUT").getDataRange().getValues();
-  for (var i = 0; i < input.length; i++) items[input[i][f.sc - 1]].items.push(input[i]);
-  return items;
-}
-function Subject(sub: any[], items: {}, knowns: {}, date: string) {
-  this.state = sub[1];
-  this.total = sub[2];
-  this.items = items[sub[0]];
-  this.data = knowns[sub[0]];
-  this.file = sub[0] + " - # " + (knowns[sub[0]]['statementNum'] || 1) + " - " + date;
-  this.folder = DriveApp.getFolderById(knowns[sub[0]['folder']]);
-  this.print = function(runFolder: GoogleAppsScript.Drive.Folder) {
-    var file = runFolder.getFilesByName(this.file).next();
-    var tmp = file.makeCopy(this.file + "tmp_pdf_copy");
-    let url = tmp.getUrl(), id = SpreadsheetApp.open(file).getSheetId();
-    let x = 'export?exportFormat=pdf&format=pdf&fitw=true&portrait=false&gridlines=false&gid=' + id;
-    url = url.replace('edit?usp=drivesdk', '') + x;
-    let tkn = ScriptApp.getOAuthToken();
-    let r = UrlFetchApp.fetch(url, { headers: { 'Authorization': 'Bearer ' + tkn } });
-    r.getBlob().setName(this.file);
-    tmp.setTrashed(true);
-    DriveApp.getFolderById(this.folder).createFile(r);
-  }
-}
-function getSubjects(f: { sc: number, sub: string }, actives: any[][], date: any) {
-  const items = getItems(f, actives), knowns = getKnowns(f);
-  return actives.map(a => Subject(a, items, knowns, date));
-}
-
-function getRunFolder(f: { name: string }, date: string) {
-  var dir = DriveApp.getFoldersByName(f.name).next();
-  var rfName = f.name + " " + date;
-  if (!dir.getFoldersByName(rfName).hasNext()) dir.createFolder(rfName);
-  return dir.getFoldersByName(rfName).next();
-}
-function runReports(f: { name: string }, subs: {}, date: string) {
-  for (var s in subs) {
-    var sub = subs[s];
-    var runFolder = getRunFolder(f, date);
-    if (!runFolder.getFilesByName(sub['file']).hasNext()) {
-      DriveApp.getFileById(subs[s]['template']).makeCopy(runFolder);
-      subs[s].state = "PRINT";
+  runReport(runFolder: GoogleAppsScript.Drive.Folder, date: string) {
+    let statementNum = (this.props['statementNum'] || 0) + 1;
+    let file = `${this.props['id']} - ${'# ' + statementNum} - ${date}`;
+    if (!runFolder.getFilesByName(file).hasNext()) {
+      DriveApp.getFileById(this.props['template']).makeCopy(file, runFolder);
+      this.state = 'PRINT';
     }
-    else { Logger.log(s + "file found"); }
   }
 }
+class Runner {
+  static doRun = (f: string, day: string, subs: {}, clear: boolean) => {
+    let dir = DriveApp.getFoldersByName(f).next();
+    let search = dir.getFoldersByName(f + ' ' + day);
+    if (search.hasNext()) search.next().setTrashed(clear);
+    let rf = (search.hasNext()) ? search.next() : dir.createFolder(f + ' ' + day);
+    for (let sub in subs) subs[sub].runReport(rf);
+  }
+}
+class WorkbookManager {
+  ss = SpreadsheetApp.getActiveSpreadsheet();
+  dash = this.ss.getSheetByName('DASH');
+  settings: any[][] = this.dash.getSheetValues(1, 2, 3, 1);
+  input = this.ss.getSheetByName('INPUT');
+  refresh = () => {
+    let f = this.settings[0][0];
+    if (this.settings[1][0] != 'NONE') {
+      let m = DriveApp.getFilesByName('OSC MASTER INPUT').next();
+      let d = SpreadsheetApp.open(m).getSheets()[1].getSheetValues(4, 2, -1, -1);
+      let r = this.input.clear().getRange(1, 1, d.length, d[0].length);
+      r.setValues(d).sort(f == 'BILLING' ? 3 : 12);
+    }
+    let date = Utilities.formatDate(this.settings[2][0], "GMT-5", "M/d/yy");
+    Runner.doRun(f, date, this.getSubjects(f), this.settings[1][0]);
+  }
+  getSubjects = (f: string) => {
+    const map = {};
+    this.dash.getSheetValues(2, 4, -1, 3).forEach((s: any[]) => {
+      if (s[1] > 0 && s[2] == 'OK' && s[3] != 'SKIP') map[s[0]] = new Subject(s);
+    });
+    let charges: any[][] = this.input.getSheetValues(1, 1, -1, -1);
+    for (let c of charges) { map[c[f == 'BILLING' ? 2 : 11]].items.push(c); }
+    let knowns = this.ss.getSheetByName(f).getSheetValues(1, 1, -1, -1);
+    let props = knowns.shift();
+    knowns = knowns.filter((k: any[]) => map.hasOwnProperty(k[0]));
+    knowns.forEach((k: any[]) => {
+      if (map.hasOwnProperty(k[0])) props.forEach((p, i) => map[k[0]].props[p] = k[i]);
+    });
+    return map;
+  }
+}
+
+// class Runner {
+//   static getRunFolder (f: string, date: string) {
+//     var dir = DriveApp.getFoldersByName(f).next();
+//     var rfName = f + " " + date;
+//     if (!dir.getFoldersByName(rfName).hasNext()) dir.createFolder(rfName);
+//     return dir.getFoldersByName(rfName).next();
+//   }
+//   static print(subs) {
+//     subs.forEach(sub => {
+//       var file = this.runFolder.getFilesByName(sub.file).next();
+//       var tmp = file.makeCopy(sub.file + "tmp_pdf_copy");
+//       let url = tmp.getUrl(), id = SpreadsheetApp.open(file).getSheetId();
+//       let x = 'export?exportFormat=pdf&format=pdf&fitw=true&portrait=false&gridlines=false&gid=' + id;
+//       url = url.replace('edit?usp=drivesdk', '') + x;
+//       let tkn = ScriptApp.getOAuthToken();
+//       let r = UrlFetchApp.fetch(url, { headers: { 'Authorization': 'Bearer ' + tkn } });
+//       r.getBlob().setName(sub.file);
+//       tmp.setTrashed(true);
+//       DriveApp.getFolderById(sub.folder).createFile(r);
+//     });
+//   }
+// }
