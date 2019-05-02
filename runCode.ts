@@ -3,7 +3,7 @@
 // var dash = ss.getSheetByName("DASH");
 function run() {
   const wkbk: WorkbookManager = new WorkbookManager();
-  wkbk.refresh();
+  wkbk.doRun();
   // const subjects = getSubjects(f, actives, date);
   // runReports(f, subjects, date);
 }
