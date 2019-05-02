@@ -37,7 +37,6 @@ class Run {
         file.setName(fn + ' - ' + this.date);
         sub.state = 'DONE';
       }
-      subs.forEach(sub => this.subs[sub].state = 'PRINT');
     }
   }
   print = () => {
@@ -67,11 +66,31 @@ class Run {
       this.rf.removeFile(sheet);
       this.subs[name].state = 'POST';
     }
-    subs.forEach(sub => this.subs[sub].state = 'RUN');
   }
   run = () => {
-    Logger.log('sorry');
     let subs = this.getSubsWithState('RUN');
+    let files = this.rf.getFiles();
+    while (files.hasNext()) {
+      let file = files.next();
+      if (subs.indexOf(file.getName()) > -1) file.setTrashed(true);
+    }
+    let template = DriveApp.getFilesByName('TEMPLATE').next();
+    for (let s of subs) {
+      let sub = subs[s];
+      let tmp = sub.props['template'] == 'default' ?
+        template : DriveApp.getFileById(sub.props['template']);
+      let ss = template.makeCopy(s, this.rf);
+      let sheet = SpreadsheetApp.open(ss).getSheets()[0];
+      let items = sub.items;
+      let rows = items.length;
+      let cols = items[0].length;
+      let info = sub.props['name'];
+      sheet.insertRows(16, rows - 1);
+      sheet.getRange(16, 1, rows, cols).setValues(items).setFontSize(10).setWrap(true);
+      sheet.getRange(4, cols-1, info.length).setValues(info);
+      sheet.getRange(16, cols, rows).setNumberFormat('$0.00');
+      SpreadsheetApp.flush();
+    }
   }
   getStates = () => {
     this.post();
