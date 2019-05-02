@@ -117,9 +117,8 @@ class WorkbookManager {
     let subs = dash.getSheetValues(2, 3, -1, 3);
     let items = input.getSheetValues(1, 1, -1, -1);
     let data = this.ss.getSheetByName(this.f).getSheetValues(1, 1, -1, -1);
-    let date = Utilities.formatDate(settings[2][0], "GMT", "MM/dd/yy");
     let clear = settings[1][0] == 'RUN';
-    let run = new Run(this.f, date, this.subs(subs, items, data), clear);
+    let run = new Run(this.f, settings[2][0], this.subs(subs, items, data), clear);
     dash.getRange(2, 6, subs.length).setValues(run.getStates());
   }
   subs = (actives: any[][], items: any[][], data: any[][]) => {
