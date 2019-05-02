@@ -20,9 +20,13 @@ class Run {
     if (search.hasNext() && this.clear) search.next().setTrashed(true);
     this.rf = search.hasNext() ? search.next()
       : this.dir.createFolder(format + ' ' + this.date);
+    this.subNames = Object.keys(subs);
+  }
+  getSubsWithState = (state: string) => {
+    return this.subNames.filter(s => this.subs[s].state == state);
   }
   post = () => {
-    let subs = Object.keys(this.subs).filter(s => this.subs[s].state == 'POST');
+    let subs = this.getSubsWithState('POST');
     let iterator = this.rf.getFilesByType('.pdf');
     while (iterator.hasNext()) {
       let file = iterator.next();
@@ -37,7 +41,7 @@ class Run {
     }
   }
   print = () => {
-    let subs = Object.keys(this.subs).filter(s => this.subs[s].state == 'PRINT');
+    let subs = this.getSubsWithState('PRINT');
     let iterator = this.rf.getFilesByType(MimeType.GOOGLE_SHEETS);
     while (iterator.hasNext()) {
       let sheet = iterator.next();
@@ -66,8 +70,8 @@ class Run {
     subs.forEach(sub => this.subs[sub].state = 'RUN');
   }
   run = () => {
-    let subs = Object.keys(this.subs).filter(s => this.subs[s].state == 'RUN');
     Logger.log('sorry');
+    let subs = this.getSubsWithState('RUN');
   }
   getStates = () => {
     this.post();
