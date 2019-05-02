@@ -8,19 +8,19 @@ class Subject {
   }
 }
 class Run {
-  f: string; date: string; subs: Object; clear: boolean;
+  subNames: string[];
+  f: string; date: string; subs: Object; clear: boolean; month: string;
   dir: GoogleAppsScript.Drive.Folder; rf: GoogleAppsScript.Drive.Folder;
-  constructor(format: string, date: string, subs: Object, clear: boolean) {
-    this.f = format;
-    this.date = date;
+  constructor(f: string, date: Date, subs: Object, clear: boolean) {
+    this.f = f;
+    this.date = Utilities.formatDate(date, "GMT", "MM/dd/yy");
     this.subs = subs;
-    this.clear = clear;
-    this.dir = DriveApp.getFoldersByName(format).next();
-    let search = this.dir.getFoldersByName(format + ' ' + this.date);
-    if (search.hasNext() && this.clear) search.next().setTrashed(true);
-    this.rf = search.hasNext() ? search.next()
-      : this.dir.createFolder(format + ' ' + this.date);
     this.subNames = Object.keys(subs);
+    let month = Utilities.formatDate(date, "GMT", "MMM").toUpperCase();
+    let dir = DriveApp.getFoldersByName(f).next();
+    let find = dir.getFoldersByName(f + ' ' + month);
+    if (find.hasNext() && clear) find.next().setTrashed(true);
+    this.rf = find.hasNext() ? find.next() : dir.createFolder(f + ' ' + month);
   }
   getSubsWithState = (state: string) => {
     return this.subNames.filter(s => this.subs[s].state == state);
