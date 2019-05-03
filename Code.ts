@@ -85,6 +85,20 @@ class Run {
       SpreadsheetApp.flush();
       sub.state = 'PRINT';
     }
+  doRun = () => {
+    let readyToPost = [], readyToPrint = [], readyToRun = [];
+    this.checkFiles();
+    let subs = Object.keys(this.subs);
+    subs.forEach(s => {
+      let sub = this.subs[s];
+      if (sub.state == 'SKIP') return;
+      if (sub.state == 'RUN' || !sub.file || this.clear) readyToRun.push(sub);
+      else if (sub.state == 'POST') readyToPost.push(sub);
+      else if (sub.state == 'PRINT') readyToPrint.push(sub);
+    });
+    this.post(readyToPost);
+    this.print(readyToPrint);
+    this.run(readyToRun);
   }
   getStates = () => {
     this.post();
