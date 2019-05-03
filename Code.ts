@@ -1,9 +1,12 @@
 class Subject {
-  items = []; props = {};
-  state: string; total: number; name: string;
+  id: string;
+  state: string;
+  total: number;
   file: GoogleAppsScript.Drive.File = null;
+  items = [];
+  props = {};
   constructor(sub: any[]) {
-    this.name = sub[0];
+    this.id = sub[0];
     this.state = (sub[1] > 0 && sub[2] == 'OK') ? sub[3] || 'RUN' : 'SKIP';
     this.total = sub[1];
   }
