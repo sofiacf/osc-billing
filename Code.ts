@@ -101,13 +101,13 @@ class Run {
   }
 }
 class WorkbookManager {
-  ss = SpreadsheetApp.getActiveSpreadsheet();
   date: string; f: string; refresh: string;
   doRun = () => {
-    let dash = this.ss.getSheetByName('DASH');
+    let ss = SpreadsheetApp.getActiveSpreadsheet();
+    let dash = ss.getSheetByName('DASH');
     let settings: any[][] = dash.getSheetValues(1, 2, 3, 1);
     this.f = settings[0][0];
-    let input = this.ss.getSheetByName('INPUT');
+    let input = ss.getSheetByName('INPUT');
     if (settings[1][0] != 'NONE') {
       let m = DriveApp.getFilesByName('OSC MASTER INPUT').next();
       let d = SpreadsheetApp.open(m).getSheets()[1].getSheetValues(4, 2, -1, -1);
@@ -117,7 +117,7 @@ class WorkbookManager {
     SpreadsheetApp.flush();
     let subs = dash.getSheetValues(2, 3, -1, 3);
     let items = input.getSheetValues(1, 1, -1, -1);
-    let data = this.ss.getSheetByName(this.f).getSheetValues(1, 1, -1, -1);
+    let data = ss.getSheetByName(this.f).getSheetValues(1, 1, -1, -1);
     let clear = settings[1][0] == 'RUN';
     let run = new Run(this.f, settings[2][0], this.subs(subs, items, data), clear);
     dash.getRange(2, 6, subs.length).setValues(run.getStates());
