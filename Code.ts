@@ -1,6 +1,7 @@
 class Subject {
   items = []; props = {};
   state: string; total: number; name: string;
+  file: GoogleAppsScript.Drive.File = null;
   constructor(sub: any[]) {
     this.name = sub[0];
     this.state = (sub[1] > 0 && sub[2] == 'OK') ? sub[3] || 'RUN' : 'SKIP';
