@@ -3,7 +3,7 @@ class Subject {
   state: string; total: number; name: string;
   constructor(sub: any[]) {
     this.name = sub[0];
-    this.state = sub[1] > 0 && sub[2] == 'OK' ? (sub[3] ? sub[3] : 'RUN') : 'SKIP';
+    this.state = (sub[1] > 0 && sub[2] == 'OK') ? sub[3] || 'RUN' : 'SKIP';
     this.total = sub[1];
   }
 }
