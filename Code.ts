@@ -32,6 +32,11 @@ class Run {
     let iterator = this.rf.getFilesByType('.pdf');
     while (iterator.hasNext()) {
       let file = iterator.next();
+  checkFiles = () => {
+    if (this.clear) return;
+    let files = this.rf.getFiles();
+    while (files.hasNext()) {
+      let file = files.next();
       let name = file.getName();
       if (subs.indexOf(name) > -1) {
         let sub = this.subs[name];
@@ -39,6 +44,11 @@ class Run {
         file.setName(fn + ' - ' + this.date);
         sub.state = 'DONE';
       }
+      if (!this.subs.hasOwnProperty(name)) continue;
+      let sub = this.subs[name];
+      if (sub.state == 'SKIP') continue;
+      if (sub.state == 'RUN') file.setTrashed(true);
+      else sub.file = file;
     }
   }
   print = () => {
