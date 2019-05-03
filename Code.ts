@@ -18,9 +18,10 @@ class Run {
     this.subNames = Object.keys(subs);
     let month = Utilities.formatDate(date, "GMT", "MMM").toUpperCase();
     let dir = DriveApp.getFoldersByName(f).next();
-    let find = dir.getFoldersByName(f + ' ' + month);
+    let runFolderName = month + ' ' + f;
+    let find = dir.getFoldersByName(runFolderName);
     if (find.hasNext() && clear) find.next().setTrashed(true);
-    this.rf = find.hasNext() ? find.next() : dir.createFolder(f + ' ' + month);
+    this.rf = find.hasNext() ? find.next() : dir.createFolder(runFolderName);
   }
   getSubsWithState = (state: string) => {
     return this.subNames.filter(s => this.subs[s].state == state);
