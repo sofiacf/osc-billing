@@ -102,12 +102,10 @@ class Run {
   }
 }
 class WorkbookManager {
-  date: string; f: string; refresh: string;
   doRun = () => {
     let ss = SpreadsheetApp.getActiveSpreadsheet();
     let dash = ss.getSheetByName('DASH');
     let settings: any[][] = dash.getSheetValues(1, 2, 3, 1);
-    this.f = settings[0][0];
     let input = ss.getSheetByName('INPUT');
     if (settings[1][0] != 'NONE') {
       let m = DriveApp.getFilesByName('OSC MASTER INPUT').next();
@@ -117,15 +115,17 @@ class WorkbookManager {
     SpreadsheetApp.flush();
     let subs = dash.getSheetValues(2, 3, -1, 3);
     let items = input.getSheetValues(1, 1, -1, -1);
-    let data = ss.getSheetByName(this.f).getSheetValues(1, 1, -1, -1);
+    let f = settings[0][0];
+    let data = ss.getSheetByName(f).getSheetValues(1, 1, -1, -1);
     let clear = settings[1][0] == 'RUN';
-    let run = new Run(this.f, settings[2][0], this.subs(subs, items, data), clear);
+    let run = new Run(f, settings[2][0], this.subs(f, subs, items, data), clear);
     dash.getRange(2, 6, subs.length).setValues(run.getStates());
   }
-  subs = (actives: any[][], items: any[][], data: any[][]) => {
+  subs = (f: string, actives: any[][], items: any[][], data: any[][]) => {
     const map = {};
     actives.forEach(a => map[a[0]] = new Subject(a));
-    items.forEach(c => map[c[this.f == 'BILLING' ? 2 : 11]].items.push(c))
+    let sc = f =='BILLING' ? 2 : 11;
+    items.forEach(c => map[c[sc]].items.push(c))
     let info = data.slice(0);
     let ps: string[] = info.shift();
     info.forEach(k => {
