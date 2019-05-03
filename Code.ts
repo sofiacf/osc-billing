@@ -92,6 +92,7 @@ class Run {
       sheet.getRange(4, cols-1, info.length).setValues(info);
       sheet.getRange(16, cols, rows).setNumberFormat('$0.00');
       SpreadsheetApp.flush();
+      sub.state = 'PRINT';
     }
   }
   getStates = () => {
