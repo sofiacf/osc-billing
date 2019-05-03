@@ -40,10 +40,11 @@ class Run {
       else sub.file = file;
     }
   }
-  print = () => {
-      let tmp = sheet.makeCopy(name + "tmp_pdf_copy");
+  print = (subs: Subject[]) => {
+    subs.forEach(sub => {
+      let tmp = sub.file.makeCopy(sub.props['id'] + "tmp_pdf_copy");
       let url = tmp.getUrl();
-      let id = SpreadsheetApp.open(sheet).getSheetId();
+      let id = SpreadsheetApp.open(sub.file).getSheetId();
       let x = ('export?exportFormat=pdf&format=pdf'
         + '&fitw=true&portrait=false&gridlines=false&gid=' + id);
       url = url.replace('edit?usp=drivesdk', '') + x;
@@ -51,39 +52,40 @@ class Run {
       let r = UrlFetchApp.fetch(url, {
         headers: { 'Authorization': 'Bearer ' + tkn }
       });
-      r.getBlob().setName(name);
+      r.getBlob().setName(sub.props['id']);
       tmp.setTrashed(true);
       this.rf.createFile(r);
-      DriveApp.getFolderById(this.subs[name].props['folder']).addFile(sheet);
-      this.rf.removeFile(sheet);
-      this.subs[name].state = 'POST';
-    }
+      DriveApp.getFolderById(sub.props['folder']).addFile(sub.file);
+      this.rf.removeFile(sub.file);
+      sub.state = 'POST';
+    });
   }
-  run = () => {
-    let subs = this.getSubsWithState('RUN');
-    let files = this.rf.getFiles();
-    while (files.hasNext()) {
-      let file = files.next();
-      if (subs.indexOf(file.getName()) > -1) file.setTrashed(true);
-    }
+  run = (subs: Subject[]) => {
     let template = DriveApp.getFilesByName('TEMPLATE').next();
-    for (let s of subs) {
-      let sub = this.subs[s];
-      let tmp = sub.props['template'] == 'default' ?
-        template : DriveApp.getFileById(sub.props['template']);
-      let ss = tmp.makeCopy(s, this.rf);
+    subs.forEach(sub => {
+      let tmp = sub.props['template'] == 'default' ? template
+        : DriveApp.getFileById(sub.props['template']);
+      let ss = tmp.makeCopy(sub.props['id'], this.rf);
       let sheet = SpreadsheetApp.open(ss).getSheets()[0];
-      let items = sub.items;
-      let rows = items.length;
-      let cols = items[0].length;
+      let rows = sub.items.length;
+      let cols = sub.items[0].length;
       let info = [['test']];
       sheet.insertRows(16, rows - 1 || 1);
-      sheet.getRange(16, 1, rows, cols).setValues(items).setFontSize(10).setWrap(true);
-      sheet.getRange(4, cols-1, info.length).setValues(info);
+      let itemsRange = sheet.getRange(16, 1, rows, cols);
+      itemsRange.setValues(sub.items).setFontSize(10).setWrap(true);
+      sheet.getRange(4, cols - 1, info.length).setValues(info);
       sheet.getRange(16, cols, rows).setNumberFormat('$0.00');
       SpreadsheetApp.flush();
       sub.state = 'PRINT';
-    }
+    })
+  }
+  post = (subs: Subject[]) => {
+    subs.forEach(sub => {
+      let fn = sub.props['id'] + ' - # ' + ((sub.props['number'] || 0) + 1);
+      sub.file.setName(fn + ' - ' + this.date);
+      sub.state = 'DONE';
+    });
+  }
   doRun = () => {
     let readyToPost = [], readyToPrint = [], readyToRun = [];
     this.checkFiles();
