@@ -112,8 +112,7 @@ class WorkbookManager {
     if (settings[1][0] != 'NONE') {
       let m = DriveApp.getFilesByName('OSC MASTER INPUT').next();
       let d = SpreadsheetApp.open(m).getSheets()[1].getSheetValues(4, 2, -1, -1);
-      let r = input.clear().getRange(1, 1, d.length, d[0].length);
-      r.setValues(d).sort(this.f == 'BILLING' ? 3 : 12);
+      input.clear().getRange(1, 1, d.length, d[0].length).setValues(d);
     }
     SpreadsheetApp.flush();
     let subs = dash.getSheetValues(2, 3, -1, 3);
