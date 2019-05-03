@@ -77,16 +77,16 @@ class Run {
     }
     let template = DriveApp.getFilesByName('TEMPLATE').next();
     for (let s of subs) {
-      let sub = subs[s];
+      let sub = this.subs[s];
       let tmp = sub.props['template'] == 'default' ?
         template : DriveApp.getFileById(sub.props['template']);
-      let ss = template.makeCopy(s, this.rf);
+      let ss = tmp.makeCopy(s, this.rf);
       let sheet = SpreadsheetApp.open(ss).getSheets()[0];
       let items = sub.items;
       let rows = items.length;
       let cols = items[0].length;
-      let info = sub.props['name'];
-      sheet.insertRows(16, rows - 1);
+      let info = [['test']];
+      sheet.insertRows(16, rows - 1 || 1);
       sheet.getRange(16, 1, rows, cols).setValues(items).setFontSize(10).setWrap(true);
       sheet.getRange(4, cols-1, info.length).setValues(info);
       sheet.getRange(16, cols, rows).setNumberFormat('$0.00');
