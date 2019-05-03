@@ -27,23 +27,12 @@ class Run {
   getSubsWithState = (state: string) => {
     return this.subNames.filter(s => this.subs[s].state == state);
   }
-  post = () => {
-    let subs = this.getSubsWithState('POST');
-    let iterator = this.rf.getFilesByType('.pdf');
-    while (iterator.hasNext()) {
-      let file = iterator.next();
   checkFiles = () => {
     if (this.clear) return;
     let files = this.rf.getFiles();
     while (files.hasNext()) {
       let file = files.next();
       let name = file.getName();
-      if (subs.indexOf(name) > -1) {
-        let sub = this.subs[name];
-        let fn = name + ' - # ' + ((sub.props['statementNum'] || 0) + 1);
-        file.setName(fn + ' - ' + this.date);
-        sub.state = 'DONE';
-      }
       if (!this.subs.hasOwnProperty(name)) continue;
       let sub = this.subs[name];
       if (sub.state == 'SKIP') continue;
@@ -52,15 +41,6 @@ class Run {
     }
   }
   print = () => {
-    let subs = this.getSubsWithState('PRINT');
-    let iterator = this.rf.getFilesByType(MimeType.GOOGLE_SHEETS);
-    while (iterator.hasNext()) {
-      let sheet = iterator.next();
-      let name = sheet.getName();
-      if (subs.indexOf(name) < 0) {
-        this.subs[name].state = 'RUN';
-        continue;
-      }
       let tmp = sheet.makeCopy(name + "tmp_pdf_copy");
       let url = tmp.getUrl();
       let id = SpreadsheetApp.open(sheet).getSheetId();
