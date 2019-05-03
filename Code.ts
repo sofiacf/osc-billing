@@ -19,13 +19,13 @@ class Run {
     this.f = f;
     this.date = Utilities.formatDate(date, "GMT", "MM/dd/yy");
     this.subs = subs;
-    let month = Utilities.formatDate(date, "GMT", "MMM").toUpperCase();
     let dir = DriveApp.getFoldersByName(f).next();
+    let month = Utilities.formatDate(date, "GMT", "MMM").toUpperCase();
     let runFolderName = month + ' ' + f;
     let find = dir.getFoldersByName(runFolderName);
     if (find.hasNext() && clear) find.next().setTrashed(true);
     this.rf = find.hasNext() ? find.next() : dir.createFolder(runFolderName);
-  }
+    this.clear = clear;
   }
   checkFiles = () => {
     if (this.clear) return;
@@ -100,10 +100,8 @@ class Run {
     this.run(readyToRun);
   }
   getStates = () => {
-    this.post();
-    this.print();
-    this.run();
-    return this.subNames.map(s => [this.subs[s].state]);
+    this.doRun();
+    return Object.keys(this.subs).map(s => [this.subs[s].state]);
   }
 }
 class WorkbookManager {
@@ -129,7 +127,7 @@ class WorkbookManager {
   subs = (f: string, actives: any[][], items: any[][], data: any[][]) => {
     const map = {};
     actives.forEach(a => map[a[0]] = new Subject(a));
-    let sc = f =='BILLING' ? 2 : 11;
+    let sc = f == 'BILLING' ? 2 : 11;
     items.forEach(c => map[c[sc]].items.push(c))
     let info = data.slice(0);
     let ps: string[] = info.shift();
