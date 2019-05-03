@@ -8,9 +8,10 @@ class Subject {
   }
 }
 class Run {
+  f: string; date: string;
+  subs: Object; clear: boolean;
   subNames: string[];
-  f: string; date: string; subs: Object; clear: boolean; month: string;
-  dir: GoogleAppsScript.Drive.Folder; rf: GoogleAppsScript.Drive.Folder;
+  rf: GoogleAppsScript.Drive.Folder;
   constructor(f: string, date: Date, subs: Object, clear: boolean) {
     this.f = f;
     this.date = Utilities.formatDate(date, "GMT", "MM/dd/yy");
@@ -97,7 +98,7 @@ class Run {
     this.post();
     this.print();
     this.run();
-    return Object.keys(this.subs).map(s => [this.subs[s].state]);
+    return this.subNames.map(s => [this.subs[s].state]);
   }
 }
 class WorkbookManager {
