@@ -14,13 +14,11 @@ class Subject {
 class Run {
   f: string; date: string;
   subs: Object; clear: boolean;
-  subNames: string[];
   rf: GoogleAppsScript.Drive.Folder;
   constructor(f: string, date: Date, subs: Object, clear: boolean) {
     this.f = f;
     this.date = Utilities.formatDate(date, "GMT", "MM/dd/yy");
     this.subs = subs;
-    this.subNames = Object.keys(subs);
     let month = Utilities.formatDate(date, "GMT", "MMM").toUpperCase();
     let dir = DriveApp.getFoldersByName(f).next();
     let runFolderName = month + ' ' + f;
@@ -28,8 +26,6 @@ class Run {
     if (find.hasNext() && clear) find.next().setTrashed(true);
     this.rf = find.hasNext() ? find.next() : dir.createFolder(runFolderName);
   }
-  getSubsWithState = (state: string) => {
-    return this.subNames.filter(s => this.subs[s].state == state);
   }
   checkFiles = () => {
     if (this.clear) return;
