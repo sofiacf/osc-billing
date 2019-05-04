@@ -120,7 +120,7 @@ class WorkbookManager {
       input.clear().getRange(1, 1, d.length, d[0].length).setValues(d);
     }
     SpreadsheetApp.flush();
-    let subs = dash.getSheetValues(2, 3, -1, 3);
+    let subs = dash.getSheetValues(2, 3, -1, 4);
     let items = input.getSheetValues(1, 1, -1, -1);
     let f = settings[0][0];
     let data = ss.getSheetByName(f).getSheetValues(1, 1, -1, -1);
