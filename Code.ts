@@ -40,26 +40,6 @@ class Run {
       else sub.file = file;
     }
   }
-  print = (subs: Subject[]) => {
-    subs.forEach(sub => {
-      let tmp = sub.file.makeCopy(sub.id + "tmp_pdf_copy");
-      let url = tmp.getUrl();
-      let id = SpreadsheetApp.open(sub.file).getSheetId();
-      let x = ('export?exportFormat=pdf&format=pdf'
-        + '&fitw=true&portrait=false&gridlines=false&gid=' + id);
-      url = url.replace('edit?usp=drivesdk', '') + x;
-      let tkn = ScriptApp.getOAuthToken();
-      let r = UrlFetchApp.fetch(url, {
-        headers: { 'Authorization': 'Bearer ' + tkn }
-      });
-      r.getBlob().setName(sub.id);
-      tmp.setTrashed(true);
-      this.rf.createFile(r);
-      DriveApp.getFolderById(sub.props['folder']).addFile(sub.file);
-      this.rf.removeFile(sub.file);
-      sub.state = 'POST';
-    });
-  }
   run = (subs: Subject[]) => {
     let template = DriveApp.getFilesByName('TEMPLATE').next();
     subs.forEach(sub => {
@@ -80,6 +60,26 @@ class Run {
       SpreadsheetApp.flush();
       sub.state = 'PRINT';
     })
+  }
+  print = (subs: Subject[]) => {
+    subs.forEach(sub => {
+      let tmp = sub.file.makeCopy(sub.id + "tmp_pdf_copy");
+      let url = tmp.getUrl();
+      let id = SpreadsheetApp.open(sub.file).getSheetId();
+      let x = ('export?exportFormat=pdf&format=pdf'
+        + '&fitw=true&portrait=false&gridlines=false&gid=' + id);
+      url = url.replace('edit?usp=drivesdk', '') + x;
+      let tkn = ScriptApp.getOAuthToken();
+      let r = UrlFetchApp.fetch(url, {
+        headers: { 'Authorization': 'Bearer ' + tkn }
+      });
+      r.getBlob().setName(sub.id);
+      tmp.setTrashed(true);
+      this.rf.createFile(r);
+      DriveApp.getFolderById(sub.props['folder']).addFile(sub.file);
+      this.rf.removeFile(sub.file);
+      sub.state = 'POST';
+    });
   }
   post = (subs: Subject[]) => {
     subs.forEach(sub => {
