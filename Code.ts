@@ -63,19 +63,16 @@ class Run {
   }
   print = (subs: Subject[]) => {
     subs.forEach(sub => {
-      let tmp = sub.file.makeCopy(sub.id + "tmp_pdf_copy");
-      let url = tmp.getUrl();
-      let id = SpreadsheetApp.open(sub.file).getSheetId();
-      let x = ('export?exportFormat=pdf&format=pdf'
-        + '&fitw=true&portrait=false&gridlines=false&gid=' + id);
-      url = url.replace('edit?usp=drivesdk', '') + x;
-      let tkn = ScriptApp.getOAuthToken();
-      let r = UrlFetchApp.fetch(url, {
-        headers: { 'Authorization': 'Bearer ' + tkn }
-      });
-      r.getBlob().setName(sub.id);
-      tmp.setTrashed(true);
-      this.rf.createFile(r);
+      let url = sub.file.getUrl().replace('edit?usp=drivesdk','');
+      let options = {
+        headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() }
+      }
+      let x = 'export?exportFormat=pdf&format=pdf&size=letter'
+        + '&portrait=false'
+        + '&fitw=true&gridlines=false&gid=0';
+      let r = UrlFetchApp.fetch(url + x, options);
+      let blob = r.getBlob().setName(sub.id);
+      this.rf.createFile(blob);
       DriveApp.getFolderById(sub.props['folder']).addFile(sub.file);
       this.rf.removeFile(sub.file);
       sub.state = 'POST';
@@ -83,7 +80,7 @@ class Run {
   }
   post = (subs: Subject[]) => {
     subs.forEach(sub => {
-      let fn = sub.id + ' - # ' + ((sub.props['number'] || 0) + 1);
+      let fn = sub.id + ' - # ' + (sub.props['number'] || 0) + 1;
       sub.file.setName(fn + ' - ' + this.date);
       sub.state = 'DONE';
     });
