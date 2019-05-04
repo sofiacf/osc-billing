@@ -67,12 +67,14 @@ class Run {
         : DriveApp.getFileById(sub.props['template']);
       let ss = tmp.makeCopy(sub.props['id'], this.rf);
       let sheet = SpreadsheetApp.open(ss).getSheets()[0];
-      let rows = sub.items.length;
-      let cols = sub.items[0].length;
+      let charges = sub.items.map((i: any[]) =>
+        [i[0]].concat(i.slice(4, sub.id == 'NIXON' ? 11 : 9)).concat(i[12]));
+      let rows = charges.length;
+      let cols = charges[0].length;
       let info = [['test']];
       sheet.insertRows(16, rows - 1 || 1);
       let itemsRange = sheet.getRange(16, 1, rows, cols);
-      itemsRange.setValues(sub.items).setFontSize(10).setWrap(true);
+      itemsRange.setValues(charges).setFontSize(10).setWrap(true);
       sheet.getRange(4, cols - 1, info.length).setValues(info);
       sheet.getRange(16, cols, rows).setNumberFormat('$0.00');
       SpreadsheetApp.flush();
