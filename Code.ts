@@ -10,8 +10,11 @@ class Subject {
   }
 }
 class Run {
-  f: string; date: Date; period: string;
-  subs: {}; rf: GoogleAppsScript.Drive.Folder;
+  f: string;
+  date: Date;
+  period: string;
+  subs: {};
+  rf: GoogleAppsScript.Drive.Folder;
   constructor(f: string, date: Date, period: string) {
     this.f = f;
     this.period = period;
