@@ -1,14 +1,12 @@
 class Subject {
   id: string;
   state: string;
-  total: number;
   file: GoogleAppsScript.Drive.File = null;
   items = [];
   props = {};
   constructor(sub: any[]) {
     this.id = sub[0];
     this.state = (sub[1] > 0 && sub[2] == 'OK') ? sub[3] || 'RUN' : 'SKIP';
-    this.total = sub[1];
   }
 }
 class Run {
@@ -37,6 +35,22 @@ class Run {
       else if (action == 'POST' && sub.state != 'POST') file.setTrashed(true);
       else sub.file = file;
     }
+  }
+  doRun = (subs: {}, action: string) => {
+    this.subs = subs;
+    this.rf = this.setupFolder();
+    this.setupFiles(action);
+    if (action == 'RESET') return;
+    let readyToPost = [], readyToPrint = [], readyToRun = [];
+    Object.keys(subs).forEach(s => {
+      let sub: Subject = subs[s];
+      if (sub.state == 'RUN') readyToRun.push(sub);
+      if (sub.state == 'PRINT') readyToPrint.push(sub);
+      if (sub.state == 'POST') readyToPost.push(sub);
+    });
+    if (action == 'POST') return this.post(readyToPost);
+    this.run(readyToRun);
+    this.print(readyToPrint);
   }
   run = (subs: Subject[]) => {
     let template = DriveApp.getFilesByName('TEMPLATE').next();
@@ -89,26 +103,6 @@ class Run {
       sub.file.setName(fn + ' - ' + this.date);
       sub.state = 'DONE';
     });
-  }
-  doRun = (subs: {}, action: string) => {
-    this.subs = subs;
-    this.rf = this.setupFolder();
-    this.setupFiles(action);
-    if (action == 'RESET') return;
-    let readyToPost = [], readyToPrint = [], readyToRun = [];
-    Object.keys(subs).forEach(s => {
-      let sub: Subject = subs[s];
-      if (sub.state == 'RUN') readyToRun.push(sub);
-      if (sub.state == 'PRINT') readyToPrint.push(sub);
-      if (sub.state == 'POST') readyToPost.push(sub);
-    });
-    if (action == 'POST') return this.post(readyToPost);
-    this.run(readyToRun);
-    this.print(readyToPrint);
-  }
-  getStates = () => {
-    this.doRun();
-    return Object.keys(this.subs).map(s => [this.subs[s].state]);
   }
 }
 class WorkbookManager {
