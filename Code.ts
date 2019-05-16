@@ -12,31 +12,29 @@ class Subject {
   }
 }
 class Run {
-  f: string; date: string;
-  subs: Object; clear: boolean;
-  rf: GoogleAppsScript.Drive.Folder;
-  constructor(f: string, date: Date, subs: Object, clear: boolean) {
+  f: string; date: Date; period: string;
+  subs: {}; rf: GoogleAppsScript.Drive.Folder;
+  constructor(f: string, date: Date, period: string) {
     this.f = f;
-    this.date = Utilities.formatDate(date, "GMT", "MM/dd/yy");
-    this.subs = subs;
-    let dir = DriveApp.getFoldersByName(f).next();
-    let month = Utilities.formatDate(date, "GMT", "MMM").toUpperCase();
-    let runFolderName = month + ' ' + f;
-    let find = dir.getFoldersByName(runFolderName);
-    if (find.hasNext() && clear) find.next().setTrashed(true);
-    this.rf = find.hasNext() ? find.next() : dir.createFolder(runFolderName);
-    this.clear = clear;
+    this.period = period;
+    this.date = date;
   }
-  checkFiles = () => {
-    if (this.clear) return;
+  setupFolder = () => {
+    let dir = DriveApp.getFoldersByName(this.f).next();
+    let folderName = this.period + ' ' + this.f;
+    let find = dir.getFoldersByName(folderName);
+    return find.hasNext() ? find.next() : dir.createFolder(folderName);
+  }
+  setupFiles = (action: string) => {
+    if (action == 'RESET') return this.rf.setTrashed(true);
     let files = this.rf.getFiles();
     while (files.hasNext()) {
       let file = files.next();
       let name = file.getName();
       if (!this.subs.hasOwnProperty(name)) continue;
       let sub = this.subs[name];
-      if (sub.state == 'SKIP') continue;
       if (sub.state == 'RUN') file.setTrashed(true);
+      else if (action == 'POST' && sub.state != 'POST') file.setTrashed(true);
       else sub.file = file;
     }
   }
@@ -47,15 +45,22 @@ class Run {
         : DriveApp.getFileById(sub.props['template']);
       let ss = tmp.makeCopy(sub.id, this.rf);
       let sheet = SpreadsheetApp.open(ss).getSheets()[0];
-      let charges = sub.items.map((i: any[]) =>
-        [i[0]].concat(i.slice(4, sub.id == 'NIXON' ? 11 : 9)).concat(i[12]));
+      let props = sub.props;
+      sheet.getNamedRanges().forEach(r => {
+        let name = r.getName();
+        if (props.hasOwnProperty(name)) r.getRange().setValue(props[name]);
+        if (this.hasOwnProperty(name)) r.getRange().setValue(this[name]);
+      });
+      let charges = sub.items.map((i: any[]) => {
+        let ar = i.slice(0, sub.id == 'NIXON' ? 11 : 9).concat(i[12]);
+        ar.splice(1, 3);
+        return ar;
+      });
       let rows = charges.length;
       let cols = charges[0].length;
-      let info = [['test']];
-      sheet.insertRows(16, rows - 1 || 1);
+      sheet.insertRows(16, rows);
       let itemsRange = sheet.getRange(16, 1, rows, cols);
       itemsRange.setValues(charges).setFontSize(10).setWrap(true);
-      sheet.getRange(4, cols - 1, info.length).setValues(info);
       sheet.getRange(16, cols, rows).setNumberFormat('$0.00');
       SpreadsheetApp.flush();
       sub.state = 'PRINT';
@@ -73,32 +78,33 @@ class Run {
       let r = UrlFetchApp.fetch(url + x, options);
       let blob = r.getBlob().setName(sub.id);
       this.rf.createFile(blob);
-      DriveApp.getFolderById(sub.props['folder']).addFile(sub.file);
-      this.rf.removeFile(sub.file);
+      // DriveApp.getFolderById(sub.props['folder']).addFile(sub.file);
+      // this.rf.removeFile(sub.file);
       sub.state = 'POST';
     });
   }
   post = (subs: Subject[]) => {
     subs.forEach(sub => {
-      let fn = sub.id + ' - # ' + (sub.props['number'] || 0) + 1;
+      let fn = sub.id + ' - # ' + sub.props['number'] + 1;
       sub.file.setName(fn + ' - ' + this.date);
       sub.state = 'DONE';
     });
   }
-  doRun = () => {
+  doRun = (subs: {}, action: string) => {
+    this.subs = subs;
+    this.rf = this.setupFolder();
+    this.setupFiles(action);
+    if (action == 'RESET') return;
     let readyToPost = [], readyToPrint = [], readyToRun = [];
-    this.checkFiles();
-    let subs = Object.keys(this.subs);
-    subs.forEach(s => {
-      let sub = this.subs[s];
-      if (sub.state == 'SKIP') return;
-      if (sub.state == 'RUN' || !sub.file || this.clear) readyToRun.push(sub);
-      else if (sub.state == 'POST') readyToPost.push(sub);
-      else if (sub.state == 'PRINT') readyToPrint.push(sub);
+    Object.keys(subs).forEach(s => {
+      let sub: Subject = subs[s];
+      if (sub.state == 'RUN') readyToRun.push(sub);
+      if (sub.state == 'PRINT') readyToPrint.push(sub);
+      if (sub.state == 'POST') readyToPost.push(sub);
     });
-    this.post(readyToPost);
-    this.print(readyToPrint);
+    if (action == 'POST') return this.post(readyToPost);
     this.run(readyToRun);
+    this.print(readyToPrint);
   }
   getStates = () => {
     this.doRun();
@@ -106,30 +112,38 @@ class Run {
   }
 }
 class WorkbookManager {
+  ss = SpreadsheetApp.getActiveSpreadsheet();
+  dash = this.ss.getSheetByName('DASH');
+  settings: any[][] = this.dash.getSheetValues(1, 2, 4, 1);
+  f = this.settings[0][0];
+  date = this.settings[3][0];
+  period = this.settings[2][0];
+  action = this.settings[1][0];
+  itemSheet = this.ss.getSheetByName(this.period);
+  dataSheet = this.ss.getSheetByName(this.f == 'BILLING' ? 'CLIENTS' : 'COURIERS');
   doRun = () => {
-    let ss = SpreadsheetApp.getActiveSpreadsheet();
-    let dash = ss.getSheetByName('DASH');
-    let settings: any[][] = dash.getSheetValues(1, 2, 3, 1);
-    let input = ss.getSheetByName('INPUT');
-    if (settings[1][0] != 'NONE') {
-      let m = DriveApp.getFilesByName('OSC MASTER INPUT').next();
-      let d = SpreadsheetApp.open(m).getSheets()[1].getSheetValues(4, 2, -1, -1);
-      input.clear().getRange(1, 1, d.length, d[0].length).setValues(d);
-    }
-    SpreadsheetApp.flush();
-    let subs = dash.getSheetValues(2, 3, -1, 4);
-    let items = input.getSheetValues(1, 1, -1, -1);
-    let f = settings[0][0];
-    let data = ss.getSheetByName(f).getSheetValues(1, 1, -1, -1);
-    let clear = settings[1][0] == 'RUN';
-    let run = new Run(f, settings[2][0], this.subs(f, subs, items, data), clear);
-    dash.getRange(2, 6, subs.length).setValues(run.getStates());
+    let actives = this.dash.getSheetValues(2, 3, -1, 4);
+    let items = this.itemSheet.getSheetValues(2, 2, -1, -1);
+    let data = this.dataSheet.getSheetValues(1, 1, -1, -1);
+    let run = new Run(this.f, this.date, this.period);
+    let subs = this.subs(actives, items, data);
+    run.doRun(subs, this.action);
+    this.updateStates(subs);
+    if (this.action != 'POST') return;
+    data.forEach((d: any[]) => {
+      if (!subs.hasOwnProperty(d[0])) return;
+      let sub = subs[d[0]];
+      if (sub.state != 'DONE') return;
+      d[1] = this.date;
+      d[2] = sub.number + 1;
+    });
+    this.dataSheet.getDataRange().setValues(data);
   }
-  subs = (f: string, actives: any[][], items: any[][], data: any[][]) => {
+  subs = (actives: any[][], items: any[][], data: any[][]) => {
     const map = {};
     actives.forEach(a => map[a[0]] = new Subject(a));
-    let sc = f == 'BILLING' ? 2 : 11;
-    items.forEach(c => map[c[sc]].items.push(c))
+    let sc = this.f == 'BILLING' ? 2 : 11;
+    items.forEach(c => (map[c[sc]] || { items: [] }).items.push(c));
     let info = data.slice(0);
     let ps: string[] = info.shift();
     info.forEach(k => {
@@ -138,5 +152,14 @@ class WorkbookManager {
       });
     });
     return map;
+  }
+  updateStates = (subs: {}) => {
+    let states = Object.keys(subs).map(s => [subs[s].state]);
+    states.forEach(s => {
+      let state = s[0];
+      if (this.action == 'POST' && state != 'DONE') s = ['SKIP'];
+      if (this.action == 'RESET' && state != 'SKIP') s = ['RUN'];
+    });
+    this.dash.getRange(2, 6, states.length).setValues(states);
   }
 }
