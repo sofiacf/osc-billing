@@ -63,7 +63,7 @@ class Run {
   }
   print = (subs: Subject[]) => {
     subs.forEach(sub => {
-      let url = sub.file.getUrl().replace('edit?usp=drivesdk','');
+      let url = sub.file.getUrl().replace('edit?usp=drivesdk', '');
       let options = {
         headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() }
       }
