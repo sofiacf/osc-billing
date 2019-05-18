@@ -160,3 +160,22 @@ class WorkbookManager {
     this.dash.getRange(2, 6, states.length).setValues(states);
   }
 }
+class ConfigurationManager {
+  ss = SpreadsheetApp.getActiveSpreadsheet();
+  readInputFields = () => {
+    let input = this.ss.getSheets()[0];
+    let fieldsRange = input.getRange(1, 1, 1, input.getLastColumn());
+    return fieldsRange.getValues()[0];
+  }
+  saveProperty = () => {
+    let fields = this.readInputFields();
+    let userProperties = PropertiesService.getUserProperties();
+    userProperties.setProperty('fields', JSON.stringify(fields));
+  }
+  readProperties = () => {
+    let userProperties = PropertiesService.getUserProperties();
+    let result = userProperties.getProperty('fields');
+    userProperties.deleteAllProperties();
+    return JSON.parse(result);
+  }
+}

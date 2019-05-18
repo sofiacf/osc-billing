@@ -3,7 +3,7 @@ var execution_modes = {
   PRODUCTION: 'production'
 }
 function run() {
-  const wkbk: WorkbookManager = new WorkbookManager();
+  const wkbk = new WorkbookManager();
   let scriptProperties = PropertiesService.getScriptProperties();
   let mode = scriptProperties.getProperty('execution_mode');
   switch (mode) {
@@ -15,19 +15,9 @@ function run() {
   }
 }
 function test() {
-  let testClient1 = {
-    name: 'thing',
-    billedThisMonth: false
-  }
-  let testClient2 = {
-    name: 'thing2',
-    billedThisMonth: false
-  }
-  let testObj = [testClient1, testClient2];
-  let testData = JSON.stringify(testObj);
-  let userProperties = PropertiesService.getUserProperties();
-  userProperties.setProperty('clients', testData);
-  let result = userProperties.getProperty('clients');
-  Logger.log(JSON.parse(result)[0].name);
-  userProperties.deleteAllProperties();
+  let cnfg = new ConfigurationManager();
+  cnfg.saveProperty();
+  let result = cnfg.readProperties();
+  Logger.log(result);
+
 }
