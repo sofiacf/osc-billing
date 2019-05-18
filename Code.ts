@@ -52,7 +52,14 @@ class Run {
       if (sub.state == 'POST') readyToPost.push(sub);
     });
     if (action == 'POST') return this.post(readyToPost);
-    this.run(readyToRun);
+    try {
+      this.run(readyToRun);
+    }
+    catch (e) {
+      let msg = 'Template not found or could not be opened.';
+      SpreadsheetApp.getActiveSpreadsheet().toast(msg, 'Error', 3);
+      return msg;
+    }
     this.print(readyToPrint);
   }
   run = (subs: Subject[]) => {
