@@ -142,6 +142,7 @@ class WorkbookManager {
       d[2] = sub.number + 1;
     });
     this.dataSheet.getDataRange().setValues(data);
+    this.ss.toast('Run complete!');
   }
   subs = (actives: any[][], items: any[][], data: any[][]) => {
     const map = {};
