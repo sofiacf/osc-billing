@@ -43,15 +43,7 @@ class Run {
     this.subs = subs;
     this.rf = this.setupFolder();
     this.setupFiles(action);
-    if (action == 'RESET') return;
-    let readyToPost = [], readyToPrint = [], readyToRun = [];
-    Object.keys(subs).forEach(s => {
-      let sub: Subject = subs[s];
-      if (sub.state == 'RUN') readyToRun.push(sub);
-      if (sub.state == 'PRINT') readyToPrint.push(sub);
-      if (sub.state == 'POST') readyToPost.push(sub);
-    });
-    if (action == 'POST') return this.post(readyToPost);
+    if (action == this.actions.RESET) return;
     try {
       this.run(readyToRun);
     }
