@@ -127,32 +127,51 @@ class Run {
 }
 class WorkbookManager {
   ss = SpreadsheetApp.getActiveSpreadsheet();
-  dash = this.ss.getSheetByName('DASH');
-  settings: any[][] = this.dash.getSheetValues(1, 2, 4, 1);
-  f = this.settings[0][0];
-  date = this.settings[3][0];
-  period = this.settings[2][0];
-  action = this.settings[1][0];
-  itemSheet = this.ss.getSheetByName(this.period);
-  dataSheet = this.ss.getSheetByName(this.f == 'BILLING' ? 'CLIENTS' : 'COURIERS');
+  formats = {
+    BILLING: 'BILLING',
+    PAYROLL: 'PAYROLL'
+  }
+  readSetup = () => {
+    let dash = this.ss.getSheetByName('DASH');
+    let settings: any[][] = dash.getSheetValues(1, 2, 4, 1);
+    return ({
+      f: settings[0][0],
+      date: settings[3][0],
+      period: settings[2][0],
+      action: settings[1][0],
+      actives: dash.getSheetValues(2, 3, -1, 4)
+    });
+  }
+  readItems = (period: string) => {
+    return this.ss.getSheetByName(period).getSheetValues(2, 2, -1, -1);
+  }
+  readSubjectData = (format: string) => {
+    let subject = format == 'BILLING' ? 'CLIENTS' : 'COURIERS';
+    return this.ss.getSheetByName(subject).getSheetValues(1, 1, -1, -1);
+  }
   doRun = () => {
-    let actives = this.dash.getSheetValues(2, 3, -1, 4);
-    let items = this.itemSheet.getSheetValues(2, 2, -1, -1);
-    let data = this.dataSheet.getSheetValues(1, 1, -1, -1);
-    let run = new Run(this.f, this.date, this.period);
-    let subs = this.subs(actives, items, data);
-    run.doRun(subs, this.action);
+    let setup = this.readSetup();
+    let items = this.readItems(setup.period);
+    let data = this.readSubjectData(setup.f);
+    let run = new Run(setup.f, setup.date, setup.period);
+    let subs = this.subs(setup.actives, items, data);
+    run.doRun(subs, setup.action);
     this.updateStates(subs);
-    if (this.action != 'POST') return;
+    if (setup.action != 'POST') return;
     data.forEach((d: any[]) => {
       if (!subs.hasOwnProperty(d[0])) return;
       let sub = subs[d[0]];
       if (sub.state != 'DONE') return;
-      d[1] = this.date;
+      d[1] = setup.date;
       d[2] = sub.number + 1;
     });
-    this.dataSheet.getDataRange().setValues(data);
-    this.ss.toast('Run complete!');
+    try {
+      this.dataSheet.getDataRange().setValues(data);
+      this.ss.toast('Run complete!');
+    }
+    catch(e) {
+      this.ss.toast('Didn\'t write subject data, probably for the best haha.')
+    }
   }
   subs = (actives: any[][], items: any[][], data: any[][]) => {
     const map = {};
