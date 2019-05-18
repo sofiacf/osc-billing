@@ -15,6 +15,11 @@ class Run {
   period: string;
   subs: {};
   rf: GoogleAppsScript.Drive.Folder;
+  actions = {
+    RESET: 'RESET',
+    POST: 'POST',
+    RUN: 'RUN'
+  }
   constructor(f: string, date: Date, period: string) {
     this.f = f;
     this.period = period;
@@ -44,15 +49,28 @@ class Run {
     this.rf = this.setupFolder();
     this.setupFiles(action);
     if (action == this.actions.RESET) return;
+    let states = {
+      RUN: 'RUN',
+      PRINT: 'PRINT',
+      POST: 'POST'
+    }
+    let actionGroups = {
+      RUN: [],
+      PRINT: [],
+      POST: []
+    }
+    for (let sub in subs) {
+      (actionGroups[subs[sub].state] || []).push(subs[sub]);
+    }
     try {
-      this.run(readyToRun);
+      this.run(actionGroups[states.RUN]);
     }
     catch (e) {
       let msg = 'Template not found or could not be opened.';
       SpreadsheetApp.getActiveSpreadsheet().toast(msg, 'Error', 3);
       return msg;
     }
-    this.print(readyToPrint);
+    this.print(actionGroups[states.PRINT]);
   }
   run = (subs: Subject[]) => {
     let template = DriveApp.getFilesByName('TEMPLATE').next();
