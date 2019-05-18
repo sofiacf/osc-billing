@@ -15,5 +15,19 @@ function run() {
   }
 }
 function test() {
-  Logger.log('test mode');
+  let testClient1 = {
+    name: 'thing',
+    billedThisMonth: false
+  }
+  let testClient2 = {
+    name: 'thing2',
+    billedThisMonth: false
+  }
+  let testObj = [testClient1, testClient2];
+  let testData = JSON.stringify(testObj);
+  let userProperties = PropertiesService.getUserProperties();
+  userProperties.setProperty('clients', testData);
+  let result = userProperties.getProperty('clients');
+  Logger.log(JSON.parse(result)[0].name);
+  userProperties.deleteAllProperties();
 }
