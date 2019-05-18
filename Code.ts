@@ -162,20 +162,23 @@ class WorkbookManager {
 }
 class ConfigurationManager {
   ss = SpreadsheetApp.getActiveSpreadsheet();
-  readInputFields = () => {
-    let input = this.ss.getSheets()[0];
-    let fieldsRange = input.getRange(1, 1, 1, input.getLastColumn());
-    return fieldsRange.getValues()[0];
+  userProperties = PropertiesService.getUserProperties();
+  set = (property: string) => {
+    let properties = {
+      FIELDS: 'fields',
+      CLIENTS: 'clients'
+    }
+    let value;
+    switch (property) {
+      case properties.FIELDS:
+        let input = this.ss.getSheets()[0];
+        value = input.getSheetValues(1, 1, 1, -1)[0];
+    }
+    this.userProperties.setProperty(property, JSON.stringify(value));
+    return this.userProperties.getProperty(property);
   }
-  saveProperty = () => {
-    let fields = this.readInputFields();
+  checkValues = (property: string) => {
     let userProperties = PropertiesService.getUserProperties();
-    userProperties.setProperty('fields', JSON.stringify(fields));
-  }
-  readProperties = () => {
-    let userProperties = PropertiesService.getUserProperties();
-    let result = userProperties.getProperty('fields');
-    userProperties.deleteAllProperties();
-    return JSON.parse(result);
+    return this.userProperties.getProperty(property) || this.set(property);
   }
 }

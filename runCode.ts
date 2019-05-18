@@ -1,6 +1,7 @@
 var execution_modes = {
   TESTING: 'testing',
-  PRODUCTION: 'production'
+  PRODUCTION: 'production',
+  ERROR: 'error'
 }
 function run() {
   const wkbk = new WorkbookManager();
@@ -12,12 +13,14 @@ function run() {
       break;
     case execution_modes.PRODUCTION:
       wkbk.doRun();
+      break;
+    default:
+      scriptProperties.setProperty('execution_mode', execution_modes.ERROR);
+      Logger.log('mode', mode, 'is unknown/failing.');
+      test();
   }
 }
 function test() {
   let cnfg = new ConfigurationManager();
-  cnfg.saveProperty();
-  let result = cnfg.readProperties();
-  Logger.log(result);
-
+  Logger.log(cnfg.checkValues('fields'));
 }
