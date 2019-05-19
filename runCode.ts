@@ -4,23 +4,19 @@ var execution_modes = {
   ERROR: 'error'
 }
 function run() {
-  const wkbk = new WorkbookManager();
+  let settings = Run.getSettings();
+  let data = Run.getData(settings.period, settings.format);
+  let folder = Run.getFolder(settings.period, settings.format);
+
   let scriptProperties = PropertiesService.getScriptProperties();
   let mode = scriptProperties.getProperty('execution_mode');
   switch (mode) {
     case execution_modes.TESTING:
-      test();
-      break;
     case execution_modes.PRODUCTION:
-      wkbk.doRun();
+      Run.run(settings.action, data, folder);
       break;
     default:
       scriptProperties.setProperty('execution_mode', execution_modes.ERROR);
       Logger.log('mode', mode, 'is unknown/failing.');
-      test();
   }
-}
-function test() {
-  let cnfg = new ConfigurationManager();
-  Logger.log(cnfg.checkValues('fields'));
 }
