@@ -13,23 +13,33 @@ class FileManager {
     let find = directory.getFoldersByName(name);
     return find.hasNext() ? find.next() : directory.createFolder(name);
   }
+  static runStatements = (action: string, folder: GoogleAppsScript.Drive.Folder, data: Data, date: Date) => {
+    if (action == DataManager.actions.RESET) {
+      folder.setTrashed(true);
+      return;
+    }
+    FileManager.run(folder, data);
+    FileManager.print(folder, data);
+    FileManager.post(folder, data, Utilities.formatDate(date, 'GMT', 'MM/dd/yy'));
+  }
   static run = (folder: GoogleAppsScript.Drive.Folder, data: Data) => {
-    let template = DriveApp.getFilesByName('TEMPLATE').next().getId();
+    let template = DriveApp.getFilesByName('TEMPLATE').next();
     let subjects: Subject[] = data.subjects.filter((sub: Subject) => sub.state == 'RUN');
     let subjectData = data.subjectData;
     let items = data.items;
     subjects.forEach(sub => {
-      let ss: GoogleAppsScript.Drive.File;
       let props = subjectData[sub.id].props;
-      try {
-        let templateId = props['template'] == 'default' ? template : props['template'];
-        ss = DriveApp.getFileById(templateId).makeCopy(sub.id, folder);
+      if (props['template'] != 'default') {
+        try {
+          template = DriveApp.getFileById(props['template']);
+        }
+        catch (e) {
+          Logger.log('No template found for', sub);
+          data.subjectData[sub.id].props['template'] = 'default';
+          template = DriveApp.getFilesByName('TEMPLATE').next();
+        }
       }
-      catch (e) {
-        Logger.log('No template found for', sub);
-        data.subjectData[sub.id].props['template'] = 'default';
-        ss = DriveApp.getFileById(template).makeCopy(sub.id, folder);
-      }
+      let ss = template.makeCopy(sub.id, folder);
       let sheet = SpreadsheetApp.open(ss).getSheets()[0];
       sheet.getNamedRanges().forEach(r => {
         let name = r.getName();
@@ -55,30 +65,42 @@ class FileManager {
       sub.state = 'PRINT';
     });
   }
-  // static print = (subjects: Subject[]) => {
-  //   subjects.forEach(sub => {
-  //     let url = sub.file.getUrl().replace('edit?usp=drivesdk', '');
-  //     let options = {
-  //       headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() }
-  //     }
-  //     let x = 'export?exportFormat=pdf&format=pdf&size=letter'
-  //       + '&portrait=false'
-  //       + '&fitw=true&gridlines=false&gid=0';
-  //     let r = UrlFetchApp.fetch(url + x, options);
-  //     let blob = r.getBlob().setName(sub.id);
-  //     this.folder.createFile(blob);
-  //     // DriveApp.getFolderById(sub.props['folder']).addFile(sub.file);
-  //     // this.rf.removeFile(sub.file);
-  //     sub.state = 'POST';
-  //   });
-  // }
-  // static post = (subjects: Subject[]) => {
-  //   subjects.forEach(sub => {
-  //     let fn = sub.id + ' - # ' + sub.props['number'] + 1;
-  //     sub.file.setName(fn + ' - ' + this.date);
-  //     sub.state = 'DONE';
-  //   });
-  // }
+  static print = (folder: GoogleAppsScript.Drive.Folder, data: Data) => {
+    let subjects = data.subjects.filter((sub: Subject) => sub.state == 'PRINT');
+    subjects.forEach(sub => {
+      let files = folder.getFilesByName(sub.id);
+      if (!files.hasNext()) {
+        sub.state = 'RUN';
+        return;
+      }
+      let file = files.next();
+      let url = file.getUrl().replace('edit?usp=drivesdk', '');
+      let options = {
+        headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() }
+      }
+      let x = 'export?exportFormat=pdf&format=pdf&size=letter'
+        + '&portrait=false'
+        + '&fitw=true&gridlines=false&gid=0';
+      let r = UrlFetchApp.fetch(url + x, options);
+      let blob = r.getBlob().setName(sub.id);
+      folder.createFile(blob);
+      // DriveApp.getFolderById(sub.props['folder']).addFile(sub.file);
+      // folder.removeFile(sub.file);
+      sub.state = 'POST';
+    });
+  }
+  static post = (folder: GoogleAppsScript.Drive.Folder, data: Data, date: string) => {
+    let subjects = data.subjects.filter((sub: Subject) => sub.state == 'POST');
+    subjects.forEach(sub => {
+      let files = folder.getFilesByName(sub.id);
+      if (!files.hasNext()) return;
+      let file = files.next();
+      let props = data.subjectData[sub.id].props;
+      let fn = sub.id + ' - # ' + (props['number'] + 1);
+      file.setName(fn + ' - ' + date + '.pdf');
+      sub.state = 'DONE';
+    });
+  }
 }
 class SheetManager {
   static ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -124,7 +146,7 @@ interface Data {
   items: {},
   subjectData: {}
 }
-class Run {
+class DataManager {
   static actions = { RESET: 'RESET', POST: 'POST', RUN: 'RUN' };
   static getSettings = () => {
     let formats = {
@@ -133,9 +155,10 @@ class Run {
     }
     let settings: any[] = SheetManager.settings.map(x => x[0]);
     return ({
+      action: settings[1],
+      date: settings[3],
       format: formats[settings[0]],
-      period: settings[2],
-      action: settings[1]
+      period: settings[2]
     });
   }
   static getData = (period: string, format: Format) => {
@@ -152,25 +175,17 @@ class Run {
         if (!acc[subject]) acc[subject] = [];
         acc[subject].push(x.slice(1));
         return acc;
-      }),
+      }, {}),
       subjectData: subjectData.reduce((acc, x) => {
         let datum = { props: {} };
         props.forEach((prop: string, i: number) => datum.props[prop] = x[i]);
         acc[x[0]] = datum;
         return acc;
-      })
+      }, {})
     }
   }
-  static getFolder = (period: string, format: Format) => {
-    let folderName = period + ' ' + format.id;
-    return FileManager.getFolder(folderName, format.id);
-  }
-  static run = (action: string, data: Data, folder: GoogleAppsScript.Drive.Folder) => {
-    if (action == Run.actions.RESET) {
-      folder.setTrashed(true);
-      return;
-    }
-    FileManager.run(folder, data);
+  static getFolderName = (period: string, format: Format) => {
+    return period + ' ' + format.id;
   }
   userProperties = PropertiesService.getUserProperties();
   setProperty = (property: string, value: any) => {

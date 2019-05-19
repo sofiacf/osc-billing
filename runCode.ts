@@ -4,16 +4,17 @@ var execution_modes = {
   ERROR: 'error'
 }
 function run() {
-  let settings = Run.getSettings();
-  let data = Run.getData(settings.period, settings.format);
-  let folder = Run.getFolder(settings.period, settings.format);
+  let settings = DataManager.getSettings();
+  let data = DataManager.getData(settings.period, settings.format);
+  let folderName = DataManager.getFolderName(settings.period, settings.format);
+  let folder = FileManager.getFolder(folderName, settings.format.id);
 
   let scriptProperties = PropertiesService.getScriptProperties();
   let mode = scriptProperties.getProperty('execution_mode');
   switch (mode) {
     case execution_modes.TESTING:
     case execution_modes.PRODUCTION:
-      Run.run(settings.action, data, folder);
+      FileManager.runStatements(settings.action, folder, data, settings.date);
       break;
     default:
       scriptProperties.setProperty('execution_mode', execution_modes.ERROR);
