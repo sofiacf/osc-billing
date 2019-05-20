@@ -7,6 +7,105 @@ class Subject {
     this.state = (sub[1] > 0 && sub[2] == 'OK') ? sub[3] || 'RUN' : 'SKIP';
   }
 }
+interface Format {
+  id: string;
+  subject: string;
+  subjectColumn: number;
+}
+interface Data {
+  subjects: Subject[],
+  items: {},
+  subjectData: {}
+}
+class SheetManager {
+  static ss = SpreadsheetApp.getActiveSpreadsheet();
+  static dash = SheetManager.ss.getSheetByName('DASH');
+  static settings = SheetManager.dash.getRange(1, 2, 4).getValues();
+  static readData = (period: string, subject: string) => {
+    let ss = SheetManager.ss;
+    return ({
+      actives: SheetManager.dash.getSheetValues(2, 3, -1, 4),
+      items: ss.getSheetByName(period).getDataRange().getValues(),
+      subjectData: ss.getSheetByName(subject).getDataRange().getValues()
+    });
+  }
+  static writeStates = (states: string[]) => {
+    SheetManager.dash.getRange(2, 6, states.length).setValues(states.map(s => [s]));
+  }
+  static updateInvoiceNumbers = () => {
+    return;
+    {// data.forEach((d: any[]) => {
+      //   if (!subs.hasOwnProperty(d[0])) return;
+      //   let sub = subs[d[0]];
+      //   if (sub.state != 'DONE') return;
+      //   d[1] = setup.date;
+      //   d[2] = sub.number + 1;
+      // });
+      // try {
+      //   this.dataSheet.getDataRange().setValues(data);
+      //   this.ss.toast('Run complete!');
+      // }
+      // catch(e) {
+      //   this.ss.toast('Didn\'t write subject data, probably for the best haha.')
+      // }
+    }
+  }
+}
+class DataManager {
+  static actions = { RESET: 'RESET', POST: 'POST', RUN: 'RUN' };
+  static getSettings = () => {
+    let formats = {
+      BILLING: { id: 'BILLING', subject: 'CLIENTS', subjectColumn: 3 },
+      PAYROLL: { id: 'PAYROLL', subject: 'COURIERS', subjectColumn: 12 }
+    }
+    let settings: any[] = SheetManager.settings.map(x => x[0]);
+    return ({
+      action: settings[1],
+      date: settings[3],
+      format: formats[settings[0]],
+      period: settings[2]
+    });
+  }
+  static getData = (period: string, format: Format) => {
+    let data = SheetManager.readData(period, format.subject);
+    let subjects = data.actives.map(sub => new Subject(sub));
+    let items: any[][] = data.items.slice(1);
+    let subjectData: any[][] = data.subjectData.slice(0);
+    let props = subjectData.shift();
+    return {
+      subjects: subjects,
+      items: items.reduce((acc, x) => {
+        let subject = x[format.subjectColumn];
+        if (!acc[subject]) acc[subject] = [];
+        acc[subject].push(x.slice(1));
+        return acc;
+      }, {}),
+      subjectData: subjectData.reduce((acc, x) => {
+        let datum = { props: {} };
+        props.forEach((prop: string, i: number) => datum.props[prop] = x[i]);
+        acc[x[0]] = datum;
+        return acc;
+      }, {})
+    }
+  }
+  static getFolderName = (period: string, format: Format) => {
+    return period + ' ' + format.id;
+  }
+  userProperties = PropertiesService.getUserProperties();
+  setProperty = (property: string, value: any) => {
+    let properties = {
+      FIELDS: 'fields',
+      CLIENTS: 'clients',
+      FORMATS: 'formats'
+    }
+    this.userProperties.setProperty(property, JSON.stringify(value));
+    return this.userProperties.getProperty(property);
+  }
+  checkPropertyValues = (property: string, value = 'RESET') => {
+    let userProperties = PropertiesService.getUserProperties();
+    return this.userProperties.getProperty(property) || this.setProperty(property, value);
+  }
+}
 class FileManager {
   static getFolder = (name: string, format: string) => {
     let directory = DriveApp.getFoldersByName(format).next();
@@ -100,105 +199,5 @@ class FileManager {
       file.setName(fn + ' - ' + date + '.pdf');
       sub.state = 'DONE';
     });
-  }
-}
-class SheetManager {
-  static ss = SpreadsheetApp.getActiveSpreadsheet();
-  static dash = SheetManager.ss.getSheetByName('DASH');
-  static settings = SheetManager.dash.getRange(1, 2, 4).getValues();
-  static readData = (period: string, subject: string) => {
-    let ss = SheetManager.ss;
-    return ({
-      actives: SheetManager.dash.getSheetValues(2, 3, -1, 4),
-      items: ss.getSheetByName(period).getDataRange().getValues(),
-      subjectData: ss.getSheetByName(subject).getDataRange().getValues()
-    });
-  }
-  static writeStates = (states: string[]) => {
-    SheetManager.dash.getRange(2, 6, states.length).setValues(states.map(s => [s]));
-  }
-  static updateInvoiceNumbers = () => {
-    return;
-    {// data.forEach((d: any[]) => {
-      //   if (!subs.hasOwnProperty(d[0])) return;
-      //   let sub = subs[d[0]];
-      //   if (sub.state != 'DONE') return;
-      //   d[1] = setup.date;
-      //   d[2] = sub.number + 1;
-      // });
-      // try {
-      //   this.dataSheet.getDataRange().setValues(data);
-      //   this.ss.toast('Run complete!');
-      // }
-      // catch(e) {
-      //   this.ss.toast('Didn\'t write subject data, probably for the best haha.')
-      // }
-    }
-  }
-}
-interface Format {
-  id: string;
-  subject: string;
-  subjectColumn: number;
-}
-interface Data {
-  subjects: Subject[],
-  items: {},
-  subjectData: {}
-}
-class DataManager {
-  static actions = { RESET: 'RESET', POST: 'POST', RUN: 'RUN' };
-  static getSettings = () => {
-    let formats = {
-      BILLING: {id: 'BILLING', subject: 'CLIENTS', subjectColumn: 3},
-      PAYROLL: { id: 'PAYROLL', subject: 'COURIERS', subjectColumn: 12 }
-    }
-    let settings: any[] = SheetManager.settings.map(x => x[0]);
-    return ({
-      action: settings[1],
-      date: settings[3],
-      format: formats[settings[0]],
-      period: settings[2]
-    });
-  }
-  static getData = (period: string, format: Format) => {
-    let data = SheetManager.readData(period, format.subject);
-    let subjects = data.actives.map(sub => new Subject(sub));
-    let items: any[][] = data.items.slice(1);
-    let sc = format.subjectColumn;
-    let subjectData: any[][] = data.subjectData.slice(0);
-    let props = subjectData.shift();
-    return {
-      subjects: subjects,
-      items: items.reduce((acc, x) => {
-        let subject = x[format.subjectColumn];
-        if (!acc[subject]) acc[subject] = [];
-        acc[subject].push(x.slice(1));
-        return acc;
-      }, {}),
-      subjectData: subjectData.reduce((acc, x) => {
-        let datum = { props: {} };
-        props.forEach((prop: string, i: number) => datum.props[prop] = x[i]);
-        acc[x[0]] = datum;
-        return acc;
-      }, {})
-    }
-  }
-  static getFolderName = (period: string, format: Format) => {
-    return period + ' ' + format.id;
-  }
-  userProperties = PropertiesService.getUserProperties();
-  setProperty = (property: string, value: any) => {
-    let properties = {
-      FIELDS: 'fields',
-      CLIENTS: 'clients',
-      FORMATS: 'formats'
-    }
-    this.userProperties.setProperty(property, JSON.stringify(value));
-    return this.userProperties.getProperty(property);
-  }
-  checkPropertyValues = (property: string, value = 'RESET') => {
-    let userProperties = PropertiesService.getUserProperties();
-    return this.userProperties.getProperty(property) || this.setProperty(property, value);
   }
 }
