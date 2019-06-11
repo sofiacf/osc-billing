@@ -1,11 +1,15 @@
-class Subject {
-  id: string;
-  state: string;
-  file: GoogleAppsScript.Drive.File;
-  constructor(sub: any[]) {
-    this.id = sub[0];
-    this.state = (sub[1] > 0 && sub[2] == 'OK') ? sub[3] || 'RUN' : 'SKIP';
-  }
+interface Address {
+  street: String;
+  city: String;
+  state: String;
+  attn: String;
+}
+interface Subject {
+  id: String;
+  name: String;
+  statement: GoogleAppsScript.Drive.File;
+  address: Address;
+  columns: Array<number>;
 }
 interface Format {
   id: string;
@@ -13,7 +17,7 @@ interface Format {
   subjectColumn: number;
 }
 interface Data {
-  subjects: Subject[],
+  ubjects: Subject[],
   items: {},
   subjectData: {}
 }
