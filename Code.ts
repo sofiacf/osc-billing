@@ -1,3 +1,17 @@
+function createRun() { //New run menu option. Only available if configured
+  let properties = PropertiesService.getDocumentProperties().getProperties();
+  Logger.log(properties['test']);
+}
+function viewCollections() {
+
+}
+function viewPayroll() {
+
+}
+function run() {
+  const setup = initialize();
+  let input = process(setup);
+}
 function process(setup: Setup) {
   let process = {
     reset: (run: Run) => {
